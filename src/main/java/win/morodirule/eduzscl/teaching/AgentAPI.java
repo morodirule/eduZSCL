@@ -1,0 +1,288 @@
+package win.morodirule.eduzscl.teaching;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import dev.latvian.mods.rhino.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class AgentAPI {
+    private static final Logger LOGGER = LoggerFactory.getLogger("AgentAPI");
+    
+    private final AgentBlockEntity agentBlock;
+    private final ServerPlayer player;
+
+    public AgentAPI(AgentBlockEntity agentBlock, ServerPlayer player) {
+        this.agentBlock = agentBlock;
+        this.player = player;
+    }
+
+    private boolean checkOperations() {
+        return agentBlock.incrementOperations();
+    }
+
+    public void log(Object... args) {
+        StringBuilder sb = new StringBuilder();
+        for (Object arg : args) {
+            if (sb.length() > 0) sb.append(" ");
+            sb.append(arg != null ? arg.toString() : "null");
+        }
+        agentBlock.log(sb.toString());
+    }
+
+    public String gotoX(int x) {
+        if (!checkOperations()) return "Operation limit exceeded";
+        
+        BlockPos current = agentBlock.getAgentPosition();
+        BlockPos newPos = new BlockPos(x, current.getY(), current.getZ());
+        
+        Level level = agentBlock.getLevel();
+        if (level == null) return "No world";
+        
+        BlockState state = level.getBlockState(newPos);
+        if (!state.isAir()) {
+            return "Cannot teleport to occupied position";
+        }
+        
+        agentBlock.setAgentPosition(newPos);
+        return "Teleported to x=" + x;
+    }
+
+    public String gotoY(int y) {
+        if (!checkOperations()) return "Operation limit exceeded";
+        
+        BlockPos current = agentBlock.getAgentPosition();
+        BlockPos newPos = new BlockPos(current.getX(), y, current.getZ());
+        
+        Level level = agentBlock.getLevel();
+        if (level == null) return "No world";
+        
+        BlockState state = level.getBlockState(newPos);
+        if (!state.isAir()) {
+            return "Cannot teleport to occupied position";
+        }
+        
+        agentBlock.setAgentPosition(newPos);
+        return "Teleported to y=" + y;
+    }
+
+    public String gotoZ(int z) {
+        if (!checkOperations()) return "Operation limit exceeded";
+        
+        BlockPos current = agentBlock.getAgentPosition();
+        BlockPos newPos = new BlockPos(current.getX(), current.getY(), z);
+        
+        Level level = agentBlock.getLevel();
+        if (level == null) return "No world";
+        
+        BlockState state = level.getBlockState(newPos);
+        if (!state.isAir()) {
+            return "Cannot teleport to occupied position";
+        }
+        
+        agentBlock.setAgentPosition(newPos);
+        return "Teleported to z=" + z;
+    }
+
+    public String gotoPos(int x, int y, int z) {
+        if (!checkOperations()) return "Operation limit exceeded";
+        
+        BlockPos newPos = new BlockPos(x, y, z);
+        
+        Level level = agentBlock.getLevel();
+        if (level == null) return "No world";
+        
+        BlockState state = level.getBlockState(newPos);
+        if (!state.isAir()) {
+            return "Cannot teleport to occupied position";
+        }
+        
+        agentBlock.setAgentPosition(newPos);
+        return "Teleported to (" + x + ", " + y + ", " + z + ")";
+    }
+
+    public String move(int steps) {
+        if (!checkOperations()) return "Operation limit exceeded";
+        
+        if (steps < 1 || steps > 100) return "Steps must be between 1 and 100";
+        
+        Level level = agentBlock.getLevel();
+        if (level == null) return "No world";
+        
+        Direction dir = agentBlock.getAgentDirection();
+        BlockPos current = agentBlock.getAgentPosition();
+        
+        for (int i = 0; i < steps; i++) {
+            BlockPos next = current.relative(dir);
+            BlockState state = level.getBlockState(next);
+            
+            if (!state.isAir()) {
+                return "Blocked at step " + (i + 1);
+            }
+            
+            current = next;
+        }
+        
+        agentBlock.setAgentPosition(current);
+        return "Moved " + steps + " blocks " + dir.getName();
+    }
+
+    public String turnLeft() {
+        if (!checkOperations()) return "Operation limit exceeded";
+        
+        agentBlock.turnLeft();
+        return "Turned left, now facing " + agentBlock.getAgentDirection().getName();
+    }
+
+    public String turnRight() {
+        if (!checkOperations()) return "Operation limit exceeded";
+        
+        agentBlock.turnRight();
+        return "Turned right, now facing " + agentBlock.getAgentDirection().getName();
+    }
+
+    public String turnTo(String direction) {
+        if (!checkOperations()) return "Operation limit exceeded";
+        
+        try {
+            Direction dir = Direction.valueOf(direction.toUpperCase());
+            agentBlock.setAgentDirection(dir);
+            return "Now facing " + dir.getName();
+        } catch (IllegalArgumentException e) {
+            return "Invalid direction: " + direction + ". Use north, south, east, or west";
+        }
+    }
+
+    public String place(String blockId) {
+        if (!checkOperations()) return "Operation limit exceeded";
+        
+        Level level = agentBlock.getLevel();
+        if (level == null) return "No world";
+        
+        BlockPos forward = agentBlock.getAgentPosition().relative(agentBlock.getAgentDirection());
+        
+        if (!level.isEmptyBlock(forward)) {
+            return "Position already occupied";
+        }
+        
+        Block block = getBlockById(blockId);
+        if (block == Blocks.AIR) {
+            return "Unknown block: " + blockId;
+        }
+        
+        level.setBlock(forward, block.defaultBlockState(), 3);
+        return "Placed " + blockId + " at (" + forward.getX() + ", " + forward.getY() + ", " + forward.getZ() + ")";
+    }
+
+    public String placeDown(String blockId) {
+        if (!checkOperations()) return "Operation limit exceeded";
+        
+        Level level = agentBlock.getLevel();
+        if (level == null) return "No world";
+        
+        BlockPos down = agentBlock.getAgentPosition().below();
+        
+        if (!level.isEmptyBlock(down)) {
+            return "Position already occupied";
+        }
+        
+        Block block = getBlockById(blockId);
+        if (block == Blocks.AIR) {
+            return "Unknown block: " + blockId;
+        }
+        
+        level.setBlock(down, block.defaultBlockState(), 3);
+        return "Placed " + blockId + " below";
+    }
+
+    public String placeUp(String blockId) {
+        if (!checkOperations()) return "Operation limit exceeded";
+        
+        Level level = agentBlock.getLevel();
+        if (level == null) return "No world";
+        
+        BlockPos up = agentBlock.getAgentPosition().above();
+        
+        if (!level.isEmptyBlock(up)) {
+            return "Position already occupied";
+        }
+        
+        Block block = getBlockById(blockId);
+        if (block == Blocks.AIR) {
+            return "Unknown block: " + blockId;
+        }
+        
+        level.setBlock(up, block.defaultBlockState(), 3);
+        return "Placed " + blockId + " above";
+    }
+
+    public String remove() {
+        if (!checkOperations()) return "Operation limit exceeded";
+        
+        Level level = agentBlock.getLevel();
+        if (level == null) return "No world";
+        
+        BlockPos forward = agentBlock.getAgentPosition().relative(agentBlock.getAgentDirection());
+        
+        if (level.isEmptyBlock(forward)) {
+            return "No block to remove";
+        }
+        
+        level.setBlock(forward, Blocks.AIR.defaultBlockState(), 3);
+        return "Removed block at forward position";
+    }
+
+    public String removeDown() {
+        if (!checkOperations()) return "Operation limit exceeded";
+        
+        Level level = agentBlock.getLevel();
+        if (level == null) return "No world";
+        
+        BlockPos down = agentBlock.getAgentPosition().below();
+        
+        if (level.isEmptyBlock(down)) {
+            return "No block to remove";
+        }
+        
+        level.setBlock(down, Blocks.AIR.defaultBlockState(), 3);
+        return "Removed block below";
+    }
+
+    public Map<String, Object> getPosition() {
+        Map<String, Object> pos = new HashMap<>();
+        BlockPos p = agentBlock.getAgentPosition();
+        pos.put("x", p.getX());
+        pos.put("y", p.getY());
+        pos.put("z", p.getZ());
+        return pos;
+    }
+
+    public String getDirection() {
+        return agentBlock.getAgentDirection().getName();
+    }
+
+    private Block getBlockById(String blockId) {
+        if (blockId == null || blockId.isEmpty()) {
+            return Blocks.AIR;
+        }
+        
+        try {
+            String fullId = blockId.contains(":") ? blockId : "minecraft:" + blockId;
+            return BuiltInRegistries.BLOCK
+                .getOptional(ResourceLocation.parse(fullId))
+                .orElse(Blocks.AIR);
+        } catch (Exception e) {
+            return Blocks.AIR;
+        }
+    }
+}
