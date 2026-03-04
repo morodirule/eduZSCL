@@ -27,6 +27,7 @@ import win.morodirule.eduzscl.Eduzscl;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public class AgentBlockEntity extends BlockEntity implements net.minecraft.world.MenuProvider {
     private static final Logger LOGGER = LoggerFactory.getLogger("AgentBlockEntity");
@@ -157,14 +158,19 @@ public class AgentBlockEntity extends BlockEntity implements net.minecraft.world
         return agentPosition;
     }
 
-    public AgentBlockEntity setAgentPosition(BlockPos pos) {
+	public AgentBlockEntity setAgentPosition(BlockPos pos) {
         Level level = this.getLevel();
+
+
         if (level == null) {
             this.agentPosition = pos;
             setChanged();
             return this;
         }
-        
+        if (level.isClientSide()){
+            level = Objects.requireNonNull(this.executingPlayer.getServer()).getLevel(level.dimension()).getLevel();
+        }
+
         if (pos.equals(this.worldPosition)) {
             this.agentPosition = pos;
             setChanged();
@@ -178,19 +184,29 @@ public class AgentBlockEntity extends BlockEntity implements net.minecraft.world
             return this;
         }
         
+        // Clear old position first
+        level.removeBlockEntity(this.worldPosition);
+        level.setBlock(this.worldPosition, Blocks.AIR.defaultBlockState(), 3);
+        
+        // Set the new block
         level.setBlock(pos, currentState, 3);
         
+        // Get or create the block entity at new position
         BlockEntity newBlockEntity = level.getBlockEntity(pos);
+        if (newBlockEntity == null) {
+            // Create block entity manually if not created
+            newBlockEntity = Eduzscl.AGENT_BLOCK_ENTITY.get().create(pos, currentState);
+            if (newBlockEntity != null) {
+                level.setBlockEntity(newBlockEntity);
+            }
+        }
+        
         if (newBlockEntity instanceof AgentBlockEntity newAgentBlock) {
             newAgentBlock.agentPosition = pos;
             newAgentBlock.direction = this.direction;
             newAgentBlock.code = this.code;
             newAgentBlock.setChanged();
 
-            // Remove the old block entity
-            level.removeBlockEntity(this.worldPosition);
-            level.setBlock(this.worldPosition, Blocks.AIR.defaultBlockState(), 3);
-            
             // Server-side notification - need to sync to clients
             if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
                 serverLevel.sendBlockUpdated(this.worldPosition, Blocks.AIR.defaultBlockState(), Blocks.AIR.defaultBlockState(), 3);

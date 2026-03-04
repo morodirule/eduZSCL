@@ -19,7 +19,7 @@ import java.util.Map;
 public class AgentAPI {
     private static final Logger LOGGER = LoggerFactory.getLogger("AgentAPI");
     
-    private final AgentBlockEntity agentBlock;
+    private AgentBlockEntity agentBlock;
     private final ServerPlayer player;
 
     public AgentAPI(AgentBlockEntity agentBlock, ServerPlayer player) {
@@ -54,7 +54,7 @@ public class AgentAPI {
             return "Cannot teleport to occupied position";
         }
         
-        agentBlock.setAgentPosition(newPos);
+        this.agentBlock = agentBlock.setAgentPosition(newPos);
         return "Teleported to x=" + x;
     }
 
@@ -72,7 +72,7 @@ public class AgentAPI {
             return "Cannot teleport to occupied position";
         }
         
-        agentBlock.setAgentPosition(newPos);
+        this.agentBlock = agentBlock.setAgentPosition(newPos);
         return "Teleported to y=" + y;
     }
 
@@ -90,7 +90,7 @@ public class AgentAPI {
             return "Cannot teleport to occupied position";
         }
         
-        agentBlock.setAgentPosition(newPos);
+        this.agentBlock = agentBlock.setAgentPosition(newPos);
         return "Teleported to z=" + z;
     }
 
@@ -107,7 +107,7 @@ public class AgentAPI {
             return "Cannot teleport to occupied position";
         }
         
-        agentBlock.setAgentPosition(newPos);
+        this.agentBlock = agentBlock.setAgentPosition(newPos);
         return "Teleported to (" + x + ", " + y + ", " + z + ")";
     }
 
@@ -133,7 +133,7 @@ public class AgentAPI {
             current = next;
         }
         
-        agentBlock.setAgentPosition(current);
+        this.agentBlock = agentBlock.setAgentPosition(current);
         return "Moved " + steps + " blocks " + dir.getName();
     }
 
