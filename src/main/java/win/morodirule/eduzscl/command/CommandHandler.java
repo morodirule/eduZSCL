@@ -1,16 +1,17 @@
-package win.morodirule.eduzscl.teaching;
+package win.morodirule.eduzscl.command;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import dev.latvian.mods.rhino.*;
+import win.morodirule.eduzscl.block.AgentBlock;
+import win.morodirule.eduzscl.blockentity.AgentBlockEntity;
+import win.morodirule.eduzscl.teaching.TeachingAgent;
 
 public class CommandHandler {
     public static void register(Commands registration) {
@@ -31,8 +32,7 @@ public class CommandHandler {
                     .then(Commands.argument("x", com.mojang.brigadier.arguments.IntegerArgumentType.integer())
                         .then(Commands.argument("y", com.mojang.brigadier.arguments.IntegerArgumentType.integer())
                             .then(Commands.argument("z", com.mojang.brigadier.arguments.IntegerArgumentType.integer())
-                                .executes(CommandHandler::openAgentGuiAtPos)))))
-        );
+                                .executes(CommandHandler::openAgentGuiAtPos))))));
     }
     
     private static int runCode(CommandContext<CommandSourceStack> ctx) {
@@ -62,15 +62,14 @@ public class CommandHandler {
         CommandSourceStack source = ctx.getSource();
         
         if (source.getEntity() instanceof ServerPlayer player) {
-            // Get block player is looking at
             Level level = player.level();
             net.minecraft.world.phys.HitResult hit = player.pick(5.0, 1.0f, false);
             if (hit instanceof net.minecraft.world.phys.BlockHitResult blockHit) {
                 BlockPos pos = blockHit.getBlockPos();
                 
                 Block block = level.getBlockState(pos).getBlock();
-                if (block instanceof win.morodirule.eduzscl.teaching.AgentBlock) {
-                    win.morodirule.eduzscl.teaching.AgentBlockEntity blockEntity = (win.morodirule.eduzscl.teaching.AgentBlockEntity) level.getBlockEntity(pos);
+                if (block instanceof AgentBlock) {
+                    AgentBlockEntity blockEntity = (AgentBlockEntity) level.getBlockEntity(pos);
                     if (blockEntity != null) {
                         player.openMenu(blockEntity);
                     } else {
@@ -99,8 +98,8 @@ public class CommandHandler {
         if (source.getEntity() instanceof ServerPlayer player) {
             Level level = player.level();
             Block block = level.getBlockState(pos).getBlock();
-            if (block instanceof win.morodirule.eduzscl.teaching.AgentBlock) {
-                win.morodirule.eduzscl.teaching.AgentBlockEntity blockEntity = (win.morodirule.eduzscl.teaching.AgentBlockEntity) level.getBlockEntity(pos);
+            if (block instanceof AgentBlock) {
+                AgentBlockEntity blockEntity = (AgentBlockEntity) level.getBlockEntity(pos);
                 if (blockEntity != null) {
                     player.openMenu(blockEntity);
                     source.sendSuccess(() -> Component.literal("Opened Agent GUI at " + x + ", " + y + ", " + z), false);

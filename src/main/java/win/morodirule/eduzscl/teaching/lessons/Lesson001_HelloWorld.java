@@ -1,6 +1,7 @@
-package win.morodirule.eduzscl.teaching;
+package win.morodirule.eduzscl.teaching.lessons;
 
-import java.util.List;
+import win.morodirule.eduzscl.teaching.TeachingAgent;
+import win.morodirule.eduzscl.teaching.TeachingAgent.Tip;
 
 public class Lesson001_HelloWorld implements TeachingAgent.Lesson {
     
@@ -75,5 +76,20 @@ Math.floor() converts decimal numbers to whole numbers.
     @Override
     public String getNextStep() {
         return "Variables - store values and use them in loops";
+    }
+    
+    @Override
+    public int getMaxOperations() {
+        return 50;
+    }
+    
+    @Override
+    public Tip[] getTips() {
+        return new Tip[] {
+            new Tip("Use Math.floor() to convert decimal coordinates to integers", "coordinates"),
+            new Tip("Block IDs can be simple like 'stone' or full like 'minecraft:stone'", "blocks"),
+            new Tip("Get your position with player.getPosition() before placing blocks", "player"),
+            new Tip("Add to x for east/west, y for up/down, z for north/south", "coordinates")
+        };
     }
 }

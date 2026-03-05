@@ -1,11 +1,9 @@
-package win.morodirule.eduzscl.teaching;
+package win.morodirule.eduzscl.blockentity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,17 +22,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import win.morodirule.eduzscl.Eduzscl;
+import win.morodirule.eduzscl.api.AgentAPI;
+import win.morodirule.eduzscl.registry.ModBlockEntities;
+import win.morodirule.eduzscl.teaching.RhinoContext;
+import win.morodirule.eduzscl.teaching.TeachingAgent;
+import win.morodirule.eduzscl.teaching.TeachingAgent.Lesson;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-public class AgentBlockEntity extends BlockEntity implements net.minecraft.world.MenuProvider {
+public class AgentBlockEntity extends BlockEntity implements MenuProvider {
     private static final Logger LOGGER = LoggerFactory.getLogger("AgentBlockEntity");
     
     private static final String AGENT_X_KEY = "agentX";
     private static final String AGENT_Y_KEY = "agentY";
     private static final String AGENT_Z_KEY = "agentZ";
+    private static final String CURRENT_LESSON_KEY = "currentLesson";
     
     private String code = "// Write your code here\nconsole.log(\"Hello, Agent!\");\nagent.move(1);\n";
     private Direction direction = Direction.NORTH;
@@ -42,9 +46,10 @@ public class AgentBlockEntity extends BlockEntity implements net.minecraft.world
     private int executionCount = 0;
     private static final int MAX_OPERATIONS = 100;
     private ServerPlayer executingPlayer;
+    private String currentLessonId = null;
 
     public AgentBlockEntity(BlockPos pos, BlockState state) {
-        super(Eduzscl.AGENT_BLOCK_ENTITY.get(), pos, state);
+        super(ModBlockEntities.AGENT_BLOCK_ENTITY.get(), pos, state);
     }
 
     public String getCode() {
@@ -55,15 +60,43 @@ public class AgentBlockEntity extends BlockEntity implements net.minecraft.world
         this.code = code;
         setChanged();
     }
+    
+    public void receiveSyncData(String code, int direction, String lessonId) {
+        this.code = code;
+        this.direction = Direction.from3DDataValue(direction);
+        this.currentLessonId = lessonId;
+        LOGGER.info("Synced code from server: {}", code.substring(0, Math.min(50, code.length())));
+    }
+    
+    public String getCurrentLessonId() {
+        return currentLessonId;
+    }
+    
+    public void setCurrentLessonId(String lessonId) {
+        this.currentLessonId = lessonId;
+        setChanged();
+    }
+    
+    public Lesson getCurrentLesson() {
+        if (currentLessonId == null) {
+            return TeachingAgent.LessonManager.getDefaultLesson();
+        }
+        return TeachingAgent.LessonManager.getLesson(currentLessonId);
+    }
+    
+    public int getMaxOperations() {
+        Lesson lesson = getCurrentLesson();
+        return lesson != null ? lesson.getMaxOperations() : MAX_OPERATIONS;
+    }
 
     @Override
-    public net.minecraft.network.chat.Component getDisplayName() {
-        return net.minecraft.network.chat.Component.literal("Agent Code Editor");
+    public Component getDisplayName() {
+        return Component.literal("Agent Code Editor");
     }
 
     @Override
     public AbstractContainerMenu createMenu(int id, Inventory inv, Player p) {
-        return new AgentBlockMenu(id, inv, this.worldPosition);
+        return new win.morodirule.eduzscl.menu.AgentBlockMenu(id, inv, this.worldPosition);
     }
 
     public void executeCode(ServerPlayer player) {
@@ -72,14 +105,13 @@ public class AgentBlockEntity extends BlockEntity implements net.minecraft.world
         
         agentPosition = this.worldPosition;
         
-        // Set global player context for APIs
         TeachingAgent.setCurrentPlayer(player);
         
+        Lesson lesson = getCurrentLesson();
+        
         try {
-            RhinoContext rhino = new RhinoContext();
-            // Use the same Context for scope creation and execution
+            RhinoContext rhino = new RhinoContext(lesson);
             Scriptable scope = rhino.getRuntime().initStandardObjects();
-            // Setup standard globals (mod, player, console)
             rhino.setupGlobals(scope);
             
             AgentAPI agentApi = new AgentAPI(this, player);
@@ -98,12 +130,12 @@ public class AgentBlockEntity extends BlockEntity implements net.minecraft.world
         }
     }
 
-    public String executeCodeFromGui(String code, net.minecraft.world.entity.player.Player player) {
+    public String executeCodeFromGui(String code, Player player) {
         if (player == null) {
             return "No player provided";
         }
         
-        if (!(player instanceof net.minecraft.server.level.ServerPlayer serverPlayer)) {
+        if (!(player instanceof ServerPlayer serverPlayer)) {
             return "Must be on server to execute code";
         }
         
@@ -113,8 +145,10 @@ public class AgentBlockEntity extends BlockEntity implements net.minecraft.world
         
         TeachingAgent.setCurrentPlayer(serverPlayer);
         
+        Lesson lesson = getCurrentLesson();
+        
         try {
-            RhinoContext rhino = new RhinoContext();
+            RhinoContext rhino = new RhinoContext(lesson);
             Scriptable scope = rhino.getRuntime().initStandardObjects();
             rhino.setupGlobals(scope);
             
@@ -158,7 +192,7 @@ public class AgentBlockEntity extends BlockEntity implements net.minecraft.world
         return agentPosition;
     }
 
-	public AgentBlockEntity setAgentPosition(BlockPos pos) {
+    public AgentBlockEntity setAgentPosition(BlockPos pos) {
         Level level = this.getLevel();
 
 
@@ -167,7 +201,7 @@ public class AgentBlockEntity extends BlockEntity implements net.minecraft.world
             setChanged();
             return this;
         }
-        if (level.isClientSide()){
+        if (level.isClientSide){
             level = Objects.requireNonNull(this.executingPlayer.getServer()).getLevel(level.dimension()).getLevel();
         }
 
@@ -184,42 +218,59 @@ public class AgentBlockEntity extends BlockEntity implements net.minecraft.world
             return this;
         }
         
-        // Clear old position first
+        // Save the current state to NBT before moving
+        CompoundTag stateTag = new CompoundTag();
+        saveToTag(stateTag);
+        
         level.removeBlockEntity(this.worldPosition);
         level.setBlock(this.worldPosition, Blocks.AIR.defaultBlockState(), 3);
         
-        // Set the new block
         level.setBlock(pos, currentState, 3);
         
-        // Get or create the block entity at new position
         BlockEntity newBlockEntity = level.getBlockEntity(pos);
         if (newBlockEntity == null) {
-            // Create block entity manually if not created
-            newBlockEntity = Eduzscl.AGENT_BLOCK_ENTITY.get().create(pos, currentState);
+            newBlockEntity = ModBlockEntities.AGENT_BLOCK_ENTITY.get().create(pos, currentState);
             if (newBlockEntity != null) {
                 level.setBlockEntity(newBlockEntity);
             }
         }
         
         if (newBlockEntity instanceof AgentBlockEntity newAgentBlock) {
+            // Load all state from NBT (code, direction, lesson, etc)
+            newAgentBlock.loadFromTag(stateTag);
             newAgentBlock.agentPosition = pos;
-            newAgentBlock.direction = this.direction;
-            newAgentBlock.code = this.code;
+            // Ensure the loaded state is marked for persistence
             newAgentBlock.setChanged();
+            
+            LOGGER.info("Loaded state into new agent block: code length = {}", newAgentBlock.code.length());
 
-            // Server-side notification - need to sync to clients
-            if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            if (level instanceof ServerLevel serverLevel) {
+                // Set the block entity in the level BEFORE sending updates
+                level.setBlockEntity(newAgentBlock);
+                
+                // Force flush the update tag so clients receive the complete NBT
+                CompoundTag updateTag = newAgentBlock.getUpdateTag(serverLevel.registryAccess());
+                LOGGER.info("Update tag contains code of length: {}", 
+                    updateTag.contains("Code") ? updateTag.getString("Code").length() : 0);
+                
+                // Update the old position with air block
                 serverLevel.sendBlockUpdated(this.worldPosition, Blocks.AIR.defaultBlockState(), Blocks.AIR.defaultBlockState(), 3);
+                // Send full block entity data to all clients at the new position
                 serverLevel.sendBlockUpdated(pos, currentState, currentState, 3);
+                
+                // If a player executed this code, reopen their menu at the new location
+                if (executingPlayer != null && executingPlayer.containerMenu instanceof win.morodirule.eduzscl.menu.AgentBlockMenu) {
+                    LOGGER.info("Reopening AgentBlockMenu for player at new position: {}, code: {}", pos, newAgentBlock.code.substring(0, Math.min(50, newAgentBlock.code.length())));
+                    executingPlayer.openMenu(newAgentBlock);
+                }
             }
+            LOGGER.info("Moved agent from {} to {}, code: {}", this.worldPosition, pos, newAgentBlock.code.substring(0, Math.min(50, newAgentBlock.code.length())));
             return newAgentBlock;
         }
         
-        // If for some reason the new block entity is not an AgentBlockEntity,
-        // revert and return current. This should not happen if block states are correct.
         LOGGER.error("New block entity at {} is not an AgentBlockEntity. Reverting move.", pos);
-        level.setBlock(this.worldPosition, currentState, 3); // Revert placing the block
-        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3); // Clear the new position
+        level.setBlock(this.worldPosition, currentState, 3);
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
         return this;
     }
 
@@ -241,34 +292,71 @@ public class AgentBlockEntity extends BlockEntity implements net.minecraft.world
         this.direction = this.direction.getClockWise();
         setChanged();
     }
-
-    // NBT save/load disabled - needs update for 1.21.4
-    /*
-    protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider provider) {
-        super.saveAdditional(tag, provider);
-        
-        tag.putString("code", code);
-        tag.putInt("direction", direction.get2DDataValue());
-        tag.putInt(AGENT_X_KEY, agentPosition.getX());
-        tag.putInt(AGENT_Y_KEY, agentPosition.getY());
-        tag.putInt(AGENT_Z_KEY, agentPosition.getZ());
+    
+    public void syncCustomData() {
+        this.setChanged();
     }
-
-    public void load(net.minecraft.core.HolderLookup.Provider provider, CompoundTag tag) {
-        super.load(provider, tag);
-        
-        this.code = tag.getString("code");
-        this.direction = Direction.from2DDataValue(tag.getInt("direction"));
-        this.agentPosition = new BlockPos(
-            tag.getInt(AGENT_X_KEY),
-            tag.getInt(AGENT_Y_KEY),
-            tag.getInt(AGENT_Z_KEY)
-        );
+    
+    @Override
+    public CompoundTag getPersistentData() {
+        CompoundTag tag = new CompoundTag();
+        saveToTag(tag);
+        return tag;
     }
-    */
 
     @Override
     public void onChunkUnloaded() {
         super.onChunkUnloaded();
+    }
+    
+    @Override
+    public void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider provider) {
+        super.saveAdditional(tag, provider);
+        saveToTag(tag);
+    }
+    
+    @Override
+    public void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider provider) {
+        super.loadAdditional(tag, provider);
+        loadFromTag(tag);
+    }
+    
+    @Override
+    public CompoundTag getUpdateTag(net.minecraft.core.HolderLookup.Provider provider) {
+        CompoundTag tag = super.getUpdateTag(provider);
+        saveToTag(tag);
+        LOGGER.info("getUpdateTag called at position {}, code: {}", this.worldPosition, code.substring(0, Math.min(30, code.length())));
+        return tag;
+    }
+    
+    @Override
+    public void handleUpdateTag(CompoundTag tag, net.minecraft.core.HolderLookup.Provider provider) {
+        super.handleUpdateTag(tag, provider);
+        LOGGER.info("handleUpdateTag called at position {}", this.worldPosition);
+        loadFromTag(tag);
+    }
+    
+    private void loadFromTag(CompoundTag tag) {
+        if (tag.contains("Code")) {
+            this.code = tag.getString("Code");
+            LOGGER.info("Loaded code from NBT: {}", this.code.substring(0, Math.min(50, this.code.length())));
+        }
+        if (tag.contains("Direction")) {
+            this.direction = Direction.from3DDataValue(tag.getInt("Direction"));
+        }
+        if (tag.contains(CURRENT_LESSON_KEY)) {
+            this.currentLessonId = tag.getString(CURRENT_LESSON_KEY);
+            LOGGER.info("Loaded lesson from NBT: {}", this.currentLessonId);
+        }
+    }
+    
+    private CompoundTag saveToTag(CompoundTag tag) {
+        tag.putString("Code", code);
+        tag.putInt("Direction", direction.get3DDataValue());
+        if (currentLessonId != null) {
+            tag.putString(CURRENT_LESSON_KEY, currentLessonId);
+        }
+        LOGGER.info("Saved code to NBT: {}", code.substring(0, Math.min(50, code.length())));
+        return tag;
     }
 }

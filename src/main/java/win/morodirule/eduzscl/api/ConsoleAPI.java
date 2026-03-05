@@ -1,4 +1,4 @@
-package win.morodirule.eduzscl.teaching;
+package win.morodirule.eduzscl.api;
 
 public class ConsoleAPI {
     
@@ -8,7 +8,7 @@ public class ConsoleAPI {
             if (sb.length() > 0) sb.append(" ");
             sb.append(arg != null ? arg.toString() : "null");
         }
-        TeachingAgent.sendMessage("§7" + sb.toString());
+        win.morodirule.eduzscl.teaching.TeachingAgent.sendMessage("§7" + sb.toString());
     }
     
     public void error(Object... args) {
@@ -17,7 +17,7 @@ public class ConsoleAPI {
             if (sb.length() > 9) sb.append(" ");
             sb.append(arg != null ? arg.toString() : "null");
         }
-        TeachingAgent.sendMessage(sb.toString());
+        win.morodirule.eduzscl.teaching.TeachingAgent.sendMessage(sb.toString());
     }
     
     public void warn(Object... args) {
@@ -26,7 +26,7 @@ public class ConsoleAPI {
             if (sb.length() > 9) sb.append(" ");
             sb.append(arg != null ? arg.toString() : "null");
         }
-        TeachingAgent.sendMessage(sb.toString());
+        win.morodirule.eduzscl.teaching.TeachingAgent.sendMessage(sb.toString());
     }
     
     public void clear() {

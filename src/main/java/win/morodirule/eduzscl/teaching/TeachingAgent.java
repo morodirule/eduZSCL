@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import win.morodirule.eduzscl.teaching.lessons.Lesson001_HelloWorld;
+
 public class TeachingAgent {
     private static final Logger LOGGER = LoggerFactory.getLogger("TeachingAgent");
     
@@ -16,7 +18,9 @@ public class TeachingAgent {
     private static final List<Lesson> lessons = new ArrayList<>();
     
     static {
-        lessons.add(new Lesson001_HelloWorld());
+        Lesson001_HelloWorld lesson001 = new Lesson001_HelloWorld();
+        lessons.add(lesson001);
+        LessonManager.registerLesson(lesson001);
     }
     
     public static void setCurrentPlayer(ServerPlayer player) {
@@ -59,8 +63,13 @@ public class TeachingAgent {
     public static void executeCode(ServerPlayer player, String code) {
         setCurrentPlayer(player);
         
+        Lesson lesson = LessonManager.getPlayerLesson(player.getUUID());
+        if (lesson == null) {
+            lesson = LessonManager.getDefaultLesson();
+        }
+        
         try {
-            RhinoContext rhino = new RhinoContext();
+            RhinoContext rhino = new RhinoContext(lesson);
             Scriptable scope = rhino.createScope();
             
             Object result = rhino.execute(code, scope);
@@ -93,26 +102,6 @@ public class TeachingAgent {
         return lessons;
     }
     
-    public static class PlayerSession {
-        private final UUID playerId;
-        private int currentLessonIndex = 0;
-        private int hintsUsed = 0;
-        private final List<String> completedLessons = new ArrayList<>();
-        
-        public PlayerSession(UUID playerId) {
-            this.playerId = playerId;
-        }
-        
-        public UUID getPlayerId() { return playerId; }
-        public int getCurrentLessonIndex() { return currentLessonIndex; }
-        public void setCurrentLessonIndex(int index) { this.currentLessonIndex = index; }
-        public int getHintsUsed() { return hintsUsed; }
-        public void incrementHints() { this.hintsUsed++; }
-        public void resetHints() { this.hintsUsed = 0; }
-        public List<String> getCompletedLessons() { return completedLessons; }
-        public void completeLesson(String lessonId) { completedLessons.add(lessonId); }
-    }
-    
     public interface Lesson {
         String getId();
         String getTitle();
@@ -123,8 +112,73 @@ public class TeachingAgent {
         Hint[] getHints();
         String getVerification();
         String getNextStep();
+        default int getMaxOperations() { return 100; }
+        default Tip[] getTips() { return new Tip[0]; }
+    }
+    
+    public record Tip(String text, String category) {
+        public Tip(String text) { this(text, "general"); }
     }
     
     public record PracticeTask(String type, String prompt, String expectedOutcome) {}
     public record Hint(String text) {}
+    
+    public static class LessonManager {
+        private static final Map<String, Lesson> lessonRegistry = new ConcurrentHashMap<>();
+        
+        public static void registerLesson(Lesson lesson) {
+            lessonRegistry.put(lesson.getId(), lesson);
+            LOGGER.info("Registered lesson: {} - {}", lesson.getId(), lesson.getTitle());
+        }
+        
+        public static Lesson getLesson(String id) {
+            return lessonRegistry.get(id);
+        }
+        
+        public static List<Lesson> getAllLessons() {
+            return new ArrayList<>(lessonRegistry.values());
+        }
+        
+        public static void setPlayerLesson(UUID playerId, String lessonId) {
+            PlayerSession session = sessions.get(playerId);
+            if (session != null) {
+                session.setCurrentLessonId(lessonId);
+            }
+        }
+        
+        public static Lesson getPlayerLesson(UUID playerId) {
+            PlayerSession session = sessions.get(playerId);
+            if (session != null && session.getCurrentLessonId() != null) {
+                return lessonRegistry.get(session.getCurrentLessonId());
+            }
+            return null;
+        }
+        
+        public static Lesson getDefaultLesson() {
+            return lessonRegistry.isEmpty() ? null : lessonRegistry.values().iterator().next();
+        }
+    }
+    
+    public static class PlayerSession {
+        private final UUID playerId;
+        private int currentLessonIndex = 0;
+        private String currentLessonId = null;
+        private int hintsUsed = 0;
+        private final List<String> completedLessons = new ArrayList<>();
+        
+        public PlayerSession(UUID playerId) {
+            this.playerId = playerId;
+        }
+        
+        public UUID getPlayerId() { return playerId; }
+        public int getCurrentLessonIndex() { return currentLessonIndex; }
+        public void setCurrentLessonIndex(int index) { this.currentLessonIndex = index; }
+        public String getCurrentLessonId() { return currentLessonId; }
+        public void setCurrentLessonId(String id) { this.currentLessonId = id; }
+        public int getHintsUsed() { return hintsUsed; }
+        public void incrementHints() { this.hintsUsed++; }
+        public void resetHints() { this.hintsUsed = 0; }
+        public List<String> getCompletedLessons() { return completedLessons; }
+        public void completeLesson(String lessonId) { completedLessons.add(lessonId); }
+    }
 }

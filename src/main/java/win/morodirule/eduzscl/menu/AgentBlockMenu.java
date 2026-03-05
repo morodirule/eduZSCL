@@ -1,12 +1,16 @@
-package win.morodirule.eduzscl.teaching;
+package win.morodirule.eduzscl.menu;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import win.morodirule.eduzscl.Eduzscl;
+import win.morodirule.eduzscl.registry.ModMenus;
+import win.morodirule.eduzscl.blockentity.AgentBlockEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,22 +18,24 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class AgentBlockMenu extends AbstractContainerMenu {
+    public static final MenuType<AgentBlockMenu> TYPE = ModMenus.AGENT_BLOCK_MENU.get();
+    
     private static final Logger LOGGER = LoggerFactory.getLogger("AgentBlockMenu");
     private static final Map<Integer, BlockPos> MENU_ID_TO_POS = new ConcurrentHashMap<>();
+    private static final Map<Integer, String> MENU_ID_TO_CODE = new ConcurrentHashMap<>();
     
-    // Supplier for client-side menu creation
     public static AgentBlockMenu create(int id, Inventory playerInventory) {
         return new AgentBlockMenu(id, playerInventory);
     }
 
-    // Client constructor
     public AgentBlockMenu(int id, Inventory playerInventory) {
-        super(Eduzscl.AGENT_BLOCK_MENU.get(), id);
+        super(ModMenus.AGENT_BLOCK_MENU.get(), id);
         BlockPos pos = MENU_ID_TO_POS.remove(id);
+        String cachedCode = MENU_ID_TO_CODE.remove(id);
         this.blockPos = pos != null ? pos : BlockPos.ZERO;
-        LOGGER.info("AgentBlockMenu client constructor - id: {}, blockPos: {}", id, this.blockPos);
+        this.cachedCode = cachedCode;
+        LOGGER.info("AgentBlockMenu client constructor - id: {}, blockPos: {}, cachedCode present: {}", id, this.blockPos, cachedCode != null);
         
-        // Try to get blockEntity from level using the BlockPos
         if (this.blockPos != BlockPos.ZERO && playerInventory.player != null && 
             playerInventory.player.level() != null) {
             BlockEntity be = playerInventory.player.level().getBlockEntity(this.blockPos);
@@ -43,19 +49,25 @@ public class AgentBlockMenu extends AbstractContainerMenu {
         }
     }
 
-    // Server constructor
     public AgentBlockMenu(int id, Inventory playerInventory, BlockPos blockPos) {
-        super(Eduzscl.AGENT_BLOCK_MENU.get(), id);
+        super(ModMenus.AGENT_BLOCK_MENU.get(), id);
         this.blockPos = blockPos;
         MENU_ID_TO_POS.put(id, blockPos);
         LOGGER.info("AgentBlockMenu server constructor - id: {}, blockPos: {}", id, blockPos);
         Player player = playerInventory.player;
         BlockEntity be = player.level().getBlockEntity(blockPos);
         this.blockEntity = be instanceof AgentBlockEntity ? (AgentBlockEntity) be : null;
+        
+        // Cache the code so the client receives it even if the block entity NBT hasn't synced yet
+        if (this.blockEntity instanceof AgentBlockEntity agent) {
+            MENU_ID_TO_CODE.put(id, agent.getCode());
+            LOGGER.info("Cached code for menu id {}: length = {}", id, agent.getCode().length());
+        }
     }
 
     private BlockPos blockPos;
     private AgentBlockEntity blockEntity;
+    private String cachedCode;
 
     public BlockPos getBlockPos() {
         return blockPos;
@@ -63,6 +75,10 @@ public class AgentBlockMenu extends AbstractContainerMenu {
 
     public AgentBlockEntity getBlockEntity() {
         return blockEntity;
+    }
+    
+    public String getCachedCode() {
+        return cachedCode;
     }
 
     @Override

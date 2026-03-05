@@ -1,10 +1,10 @@
-package win.morodirule.eduzscl.teaching;
+package win.morodirule.eduzscl.api;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.resources.ResourceLocation;
+import win.morodirule.eduzscl.teaching.TeachingAgent;
 
 import java.util.HashMap;
 import java.util.Map;

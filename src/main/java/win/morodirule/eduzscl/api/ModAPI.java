@@ -1,4 +1,4 @@
-package win.morodirule.eduzscl.teaching;
+package win.morodirule.eduzscl.api;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
@@ -6,6 +6,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import win.morodirule.eduzscl.teaching.RhinoContext;
+import win.morodirule.eduzscl.teaching.TeachingAgent;
 
 public class ModAPI {
     private final RhinoContext rhinoContext;

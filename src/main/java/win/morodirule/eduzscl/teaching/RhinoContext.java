@@ -4,17 +4,30 @@ import dev.latvian.mods.rhino.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import win.morodirule.eduzscl.api.ConsoleAPI;
+import win.morodirule.eduzscl.api.ModAPI;
+import win.morodirule.eduzscl.api.PlayerAPI;
+import win.morodirule.eduzscl.teaching.TeachingAgent.Lesson;
+
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class RhinoContext {
     private static final Logger LOGGER = LoggerFactory.getLogger("RhinoContext");
-    private static final int MAX_OPERATIONS = 1000;
+    private static final int DEFAULT_MAX_OPERATIONS = 1000;
     
     private final AtomicInteger operationCount = new AtomicInteger(0);
     private final Context runtime;
+    private final int maxOperations;
+    private Lesson currentLesson;
     
     public RhinoContext() {
-        runtime = new Context(new ContextFactory());
+        this(null);
+    }
+    
+    public RhinoContext(Lesson lesson) {
+        this.runtime = new Context(new ContextFactory());
+        this.currentLesson = lesson;
+        this.maxOperations = lesson != null ? lesson.getMaxOperations() : DEFAULT_MAX_OPERATIONS;
     }
     
     public Context getRuntime() {
@@ -22,11 +35,19 @@ public class RhinoContext {
     }
     
     public boolean incrementOperations() {
-        return operationCount.incrementAndGet() <= MAX_OPERATIONS;
+        return operationCount.incrementAndGet() <= maxOperations;
     }
     
     public int getOperationCount() {
         return operationCount.get();
+    }
+    
+    public int getMaxOperations() {
+        return maxOperations;
+    }
+    
+    public Lesson getCurrentLesson() {
+        return currentLesson;
     }
     
     public void resetOperations() {

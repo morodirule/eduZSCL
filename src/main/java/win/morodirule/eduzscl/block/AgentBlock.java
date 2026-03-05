@@ -1,4 +1,4 @@
-package win.morodirule.eduzscl.teaching;
+package win.morodirule.eduzscl.block;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
+import win.morodirule.eduzscl.blockentity.AgentBlockEntity;
 
 public class AgentBlock extends Block implements EntityBlock {
 

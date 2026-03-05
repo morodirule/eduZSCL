@@ -1,4 +1,4 @@
-package win.morodirule.eduzscl.teaching;
+package win.morodirule.eduzscl.api;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -12,6 +12,8 @@ import net.minecraft.resources.ResourceLocation;
 import dev.latvian.mods.rhino.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import win.morodirule.eduzscl.blockentity.AgentBlockEntity;
 
 import java.util.HashMap;
 import java.util.Map;
