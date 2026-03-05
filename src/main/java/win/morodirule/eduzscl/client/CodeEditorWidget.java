@@ -395,7 +395,7 @@ public class CodeEditorWidget implements Renderable {
             if (i == cursorLine) {
                 String line = lines[i];
                 sb.append(line.substring(0, cursorColumn - currentWord.length()));
-                sb.append(line);
+                sb.append(currentWord);
                 sb.append(completion);
                 sb.append(line.substring(cursorColumn));
             } else {
@@ -405,7 +405,7 @@ public class CodeEditorWidget implements Renderable {
         }
         
         text = sb;
-        cursorColumn = cursorColumn - currentWord.length() + completion.length();
+        cursorColumn = cursorColumn + completion.length();
         showAutocomplete = false;
         updateCursorPosition();
     }

@@ -1,5 +1,6 @@
 package win.morodirule.eduzscl.api;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
@@ -17,6 +18,7 @@ import win.morodirule.eduzscl.blockentity.AgentBlockEntity;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public class AgentAPI {
     private static final Logger LOGGER = LoggerFactory.getLogger("AgentAPI");
@@ -167,10 +169,15 @@ public class AgentAPI {
 
     public String place(String blockId) {
         if (!checkOperations()) return "Operation limit exceeded";
-        
+
         Level level = agentBlock.getLevel();
+
         if (level == null) return "No world";
-        
+
+        if (level.isClientSide){
+            level = Objects.requireNonNull(this.player.getServer()).getLevel(level.dimension()).getLevel();
+        }
+
         BlockPos forward = agentBlock.getAgentPosition().relative(agentBlock.getAgentDirection());
         
         if (!level.isEmptyBlock(forward)) {

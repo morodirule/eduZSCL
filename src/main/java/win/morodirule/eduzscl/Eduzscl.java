@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -58,8 +59,8 @@ public class Eduzscl {
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == net.minecraft.world.item.CreativeModeTabs.BUILDING_BLOCKS)
-            event.accept(ModItems.EXAMPLE_BLOCK_ITEM);
+        if (event.getTabKey() == CreativeModeTabs.OP_BLOCKS)
+            event.accept(ModItems.AGENT_BLOCK_ITEM);
     }
 
     @EventBusSubscriber(modid = MODID, value = Dist.CLIENT)
