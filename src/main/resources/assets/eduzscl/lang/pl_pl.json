@@ -1,0 +1,29 @@
+{
+  "block.eduzscl.example_block": "Przykładowy blok",
+  "block.eduzscl.agent_block": "Blok Agenta",
+  "item.eduzscl.example_item": "Przykładowy przedmiot",
+  "item.eduzscl.agent_block": "Blok Agenta",
+  "gui.eduzscl.agent_editor.title": "Edytor Kodu Agenta",
+  "gui.eduzscl.agent_editor.run": "Uruchom",
+  "gui.eduzscl.agent_editor.reset": "Resetuj",
+  "gui.eduzscl.agent_editor.close": "Zamknij",
+  "gui.eduzscl.agent_editor.max_ops": "Maks. operacji: %s",
+  "gui.eduzscl.agent_editor.goal": "Cel:",
+  "gui.eduzscl.agent_editor.tips": "Wskazówki:",
+  "gui.eduzscl.agent_editor.code_editor": "Edytor Kodu",
+  "gui.eduzscl.agent_editor.default_code": "// Napisz swój kod tutaj
+console.log("Witaj, Agencie!");
+agent.move(1);
+",
+  "command.eduzscl.js.player_only": "Musisz być graczem, aby uruchomić kod JS",
+  "command.eduzscl.js.help.header": "§6=== Edukacyjny Agent JavaScript ===",
+  "command.eduzscl.js.help.js": "§e/js <kod> - Uruchamia kod JavaScript",
+  "command.eduzscl.js.help.help": "§e/js help - Pokazuje tę pomoc",
+  "command.eduzscl.js.help.open": "§e/agent open - Otwiera GUI Bloku Agenta",
+  "command.eduzscl.js.help.debug": "§e/agent debug <x> <y> <z> - Otwiera GUI na danej pozycji",
+  "command.eduzscl.agent.not_found": "Brak Bloku Agenta na podanej pozycji",
+  "command.eduzscl.agent.not_looking_at_agent": "Nie patrzysz na Blok Agenta",
+  "command.eduzscl.agent.not_looking_at_block": "Nie patrzysz na żaden blok",
+  "command.eduzscl.agent.player_only": "Musisz być graczem",
+  "command.eduzscl.agent.debug_success": "Otwarto GUI Agenta na pozycji %s, %s, %s"
+}

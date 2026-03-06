@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "eduzscl:block/agent_block" },
+    "facing=south": { "model": "eduzscl:block/agent_block", "y": 180 },
+    "facing=east": { "model": "eduzscl:block/agent_block", "y": 90 },
+    "facing=west": { "model": "eduzscl:block/agent_block", "y": 270 }
+  }
+}
