@@ -1,5 +1,26 @@
 {
-  "itemGroup.eduzscl": "Example Mod Tab",
   "block.eduzscl.example_block": "Example Block",
-  "item.eduzscl.example_item": "Example Item"
+  "block.eduzscl.agent_block": "Agent Block",
+  "item.eduzscl.example_item": "Example Item",
+  "item.eduzscl.agent_block": "Agent Block",
+  "gui.eduzscl.agent_editor.title": "Agent Code Editor",
+  "gui.eduzscl.agent_editor.run": "Run",
+  "gui.eduzscl.agent_editor.reset": "Reset",
+  "gui.eduzscl.agent_editor.close": "Close",
+  "gui.eduzscl.agent_editor.max_ops": "Max Ops: %s",
+  "gui.eduzscl.agent_editor.goal": "Goal:",
+  "gui.eduzscl.agent_editor.tips": "Tips:",
+  "gui.eduzscl.agent_editor.code_editor": "Code Editor",
+  "gui.eduzscl.agent_editor.default_code": "// Write your code here\nconsole.log(\"Hello, Agent!\");\nagent.move(1);\n",
+  "command.eduzscl.js.player_only": "Must be a player to run JS code",
+  "command.eduzscl.js.help.header": "§6=== JavaScript Teaching Agent ===",
+  "command.eduzscl.js.help.js": "§e/js <code> - Run JavaScript code",
+  "command.eduzscl.js.help.help": "§e/js help - Show this help",
+  "command.eduzscl.js.help.open": "§e/agent open - Open Agent Block GUI",
+  "command.eduzscl.js.help.debug": "§e/agent debug <x> <y> <z> - Open GUI at position",
+  "command.eduzscl.agent.not_found": "No Agent Block at position",
+  "command.eduzscl.agent.not_looking_at_agent": "Not looking at an Agent Block",
+  "command.eduzscl.agent.not_looking_at_block": "Not looking at a block",
+  "command.eduzscl.agent.player_only": "Must be a player",
+  "command.eduzscl.agent.debug_success": "Opened Agent GUI at %s, %s, %s"
 }

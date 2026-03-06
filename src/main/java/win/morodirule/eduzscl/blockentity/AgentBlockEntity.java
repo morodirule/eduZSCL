@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import win.morodirule.eduzscl.Eduzscl;
 import win.morodirule.eduzscl.api.AgentAPI;
+import win.morodirule.eduzscl.block.AgentBlock;
 import win.morodirule.eduzscl.registry.ModBlockEntities;
 import win.morodirule.eduzscl.teaching.RhinoContext;
 import win.morodirule.eduzscl.teaching.TeachingAgent;
@@ -50,6 +51,9 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
 
     public AgentBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.AGENT_BLOCK_ENTITY.get(), pos, state);
+        if (state.hasProperty(AgentBlock.FACING)) {
+            this.direction = state.getValue(AgentBlock.FACING);
+        }
     }
 
     public String getCode() {
@@ -65,6 +69,12 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
         this.code = code;
         this.direction = Direction.from3DDataValue(direction);
         this.currentLessonId = lessonId;
+        if (level != null && worldPosition != null) {
+            BlockState state = level.getBlockState(worldPosition);
+            if (state.hasProperty(AgentBlock.FACING)) {
+                level.setBlock(worldPosition, state.setValue(AgentBlock.FACING, this.direction), 3);
+            }
+        }
         LOGGER.info("Synced code from server: {}", code.substring(0, Math.min(50, code.length())));
     }
     
@@ -185,6 +195,10 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
         return ++executionCount <= MAX_OPERATIONS;
     }
 
+    public void setExecutingPlayer(ServerPlayer player) {
+        this.executingPlayer = player;
+    }
+
     public BlockPos getAgentPosition() {
         if (agentPosition.equals(BlockPos.ZERO)) {
             agentPosition = this.worldPosition;
@@ -261,6 +275,7 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
                 // If a player executed this code, reopen their menu at the new location
                 if (executingPlayer != null && executingPlayer.containerMenu instanceof win.morodirule.eduzscl.menu.AgentBlockMenu) {
                     LOGGER.info("Reopening AgentBlockMenu for player at new position: {}, code: {}", pos, newAgentBlock.code.substring(0, Math.min(50, newAgentBlock.code.length())));
+                    newAgentBlock.setExecutingPlayer(executingPlayer);
                     executingPlayer.openMenu(newAgentBlock);
                 }
             }
@@ -280,16 +295,43 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
 
     public void setAgentDirection(Direction direction) {
         this.direction = direction;
+        if (level != null && worldPosition != null) {
+            BlockState state = level.getBlockState(worldPosition);
+            if (state.hasProperty(AgentBlock.FACING)) {
+                if (level.isClientSide()){
+                    level = Objects.requireNonNull(this.executingPlayer.getServer()).getLevel(level.dimension()).getLevel();
+                }
+                level.setBlock(worldPosition, state.setValue(AgentBlock.FACING, direction), 3);
+            }
+        }
         setChanged();
     }
 
     public void turnLeft() {
         this.direction = this.direction.getCounterClockWise();
+        if (level != null && worldPosition != null) {
+            BlockState state = level.getBlockState(worldPosition);
+            if (state.hasProperty(AgentBlock.FACING)) {
+                if (level.isClientSide()){
+                    level = Objects.requireNonNull(this.executingPlayer.getServer()).getLevel(level.dimension()).getLevel();
+                }
+                level.setBlock(worldPosition, state.setValue(AgentBlock.FACING, this.direction), 3);
+            }
+        }
         setChanged();
     }
 
     public void turnRight() {
         this.direction = this.direction.getClockWise();
+        if (level != null && worldPosition != null) {
+            BlockState state = level.getBlockState(worldPosition);
+            if (state.hasProperty(AgentBlock.FACING)) {
+                if (level.isClientSide()){
+                    level = Objects.requireNonNull(this.executingPlayer.getServer()).getLevel(level.dimension()).getLevel();
+                }
+                level.setBlock(worldPosition, state.setValue(AgentBlock.FACING, this.direction), 3);
+            }
+        }
         setChanged();
     }
     

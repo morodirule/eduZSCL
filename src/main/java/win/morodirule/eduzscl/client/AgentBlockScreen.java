@@ -46,13 +46,13 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
     private int codeAreaX;
 
     public AgentBlockScreen(BlockPos blockPos) {
-        super(Component.literal("Agent Code Editor"));
+        super(Component.translatable("gui.eduzscl.agent_editor.title"));
         this.blockPos = blockPos;
         this.inventory = null;
     }
 
     public AgentBlockScreen(AgentBlockMenu menu) {
-        super(Component.literal("Agent Code Editor"));
+        super(Component.translatable("gui.eduzscl.agent_editor.title"));
         this.menu = menu;
         this.inventory = null;
         LOGGER.info("AgentBlockScreen created - menu: {}, blockPos: {}, blockEntity: {}", 
@@ -61,7 +61,7 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
     }
 
     public AgentBlockScreen(AgentBlockMenu menu, Inventory inventory, Component component) {
-        super(Component.literal("Agent Code Editor"));
+        super(Component.translatable("gui.eduzscl.agent_editor.title"));
         this.menu = menu;
         this.inventory = inventory;
         LOGGER.info("AgentBlockScreen created - menu: {}, inventory.player: {}", 
@@ -129,7 +129,7 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
             codeToDisplay = menu.getBlockEntity().getCode();
             LOGGER.info("Using code from block entity, length: {}", codeToDisplay.length());
         } else {
-            codeToDisplay = "// Write your code here\nconsole.log(\"Hello, Agent!\");\nagent.move(1);\n";
+            codeToDisplay = Component.translatable("gui.eduzscl.agent_editor.default_code").getString();
             LOGGER.info("Using default code");
         }
         
@@ -139,24 +139,25 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
         int codeAreaCenterX = windowX + TEXT_FIELD_MARGIN + SIDEBAR_WIDTH + textFieldWidth / 2;
 
         this.runButton = Button.builder(
-                Component.literal("Run"),
+                Component.translatable("gui.eduzscl.agent_editor.run"),
                 button -> this.runCode()
         ).bounds(codeAreaCenterX - BUTTON_WIDTH - BUTTON_MARGIN, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT).build();
         this.addRenderableWidget(runButton);
 
         this.resetButton = Button.builder(
-                Component.literal("Reset"),
+                Component.translatable("gui.eduzscl.agent_editor.reset"),
                 button -> {
-                    codeEditor.setText("// Write your code here\nconsole.log(\"Hello, Agent!\");\nagent.move(1);\n");
+                    codeEditor.setText(Component.translatable("gui.eduzscl.agent_editor.default_code").getString());
                 }
         ).bounds(codeAreaCenterX + BUTTON_MARGIN, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT).build();
         this.addRenderableWidget(resetButton);
 
         this.closeButton = Button.builder(
-                Component.literal("Close"),
+                Component.translatable("gui.eduzscl.agent_editor.close"),
                 button -> this.onClose()
         ).bounds(codeAreaCenterX - BUTTON_WIDTH / 2, buttonY + BUTTON_HEIGHT + 5, BUTTON_WIDTH, BUTTON_HEIGHT).build();
         this.addRenderableWidget(closeButton);
+
         
         int sidebarX = windowX + TEXT_FIELD_MARGIN;
         
@@ -243,9 +244,9 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
         if (menu != null && menu.getBlockEntity() != null) {
             maxOps = menu.getBlockEntity().getMaxOperations();
         }
-        graphics.drawString(this.font, "Max Ops: " + maxOps, sidebarX + 5, windowY + 55, 0xAAAAAA);
+        graphics.drawString(this.font, Component.translatable("gui.eduzscl.agent_editor.max_ops", maxOps).getString(), sidebarX + 5, windowY + 55, 0xAAAAAA);
         
-        graphics.drawString(this.font, "Goal:", sidebarX + 5, windowY + 75, 0x00FF00);
+        graphics.drawString(this.font, Component.translatable("gui.eduzscl.agent_editor.goal").getString(), sidebarX + 5, windowY + 75, 0x00FF00);
         
         String[] goalLines = splitString(currentGoal, SIDEBAR_WIDTH - 10);
         int yOffset = 90;
@@ -256,7 +257,7 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
         
         if (!currentTips.isEmpty()) {
             yOffset += 10;
-            graphics.drawString(this.font, "Tips:", sidebarX + 5, windowY + yOffset, 0x00FFFF);
+            graphics.drawString(this.font, Component.translatable("gui.eduzscl.agent_editor.tips").getString(), sidebarX + 5, windowY + yOffset, 0x00FFFF);
             yOffset += 15;
             
             String[] tipLines = splitString(currentTips, SIDEBAR_WIDTH - 10);

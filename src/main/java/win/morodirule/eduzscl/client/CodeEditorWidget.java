@@ -89,37 +89,37 @@ public class CodeEditorWidget implements Renderable {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         String[] lines = getLines();
-        
+
         int visibleLines = (height - LINE_HEIGHT * 2) / LINE_HEIGHT;
         int maxScroll = Math.max(0, lines.length - visibleLines);
         scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
-        
+
         for (int i = scrollOffset; i < lines.length && i < scrollOffset + visibleLines; i++) {
             int lineY = y + PADDING + (i - scrollOffset) * LINE_HEIGHT + LINE_HEIGHT;
-            
+
             String lineNum = String.valueOf(i + 1);
             graphics.drawString(font, lineNum, x + PADDING, lineY - font.lineHeight + 2, 0xFF666666);
-            
+
             if (i < lines.length) {
                 graphics.drawString(font, lines[i], x + PADDING + 30, lineY - font.lineHeight + 2, 0xFFCCCCCC);
             }
         }
-        
+
         if (focused && cursorVisible) {
             String[] currentLines = getLines();
             if (cursorLine < currentLines.length) {
-                String beforeCursor = cursorLine < currentLines.length ? 
+                String beforeCursor = cursorLine < currentLines.length ?
                     currentLines[cursorLine].substring(0, Math.min(cursorColumn, currentLines[cursorLine].length())) : "";
                 int cursorX = x + PADDING + 30 + font.width(beforeCursor);
                 int cursorY = y + PADDING + (cursorLine - scrollOffset) * LINE_HEIGHT + LINE_HEIGHT;
                 graphics.fill(cursorX, cursorY - font.lineHeight + 2, cursorX + 1, cursorY + 2, 0xFFFFFFFF);
             }
         }
-        
+
         if (showAutocomplete && !autocompleteEntries.isEmpty()) {
             renderAutocomplete(graphics, mouseX, mouseY);
         }
-        
+
         if (System.currentTimeMillis() - lastCursorBlink > CURSOR_BLINK_INTERVAL) {
             cursorVisible = !cursorVisible;
             lastCursorBlink = System.currentTimeMillis();
@@ -127,36 +127,63 @@ public class CodeEditorWidget implements Renderable {
     }
     
     private void renderAutocomplete(GuiGraphics graphics, int mouseX, int mouseY) {
-        int autocompleteX = x + PADDING + 30;
+        String[] currentLines = getLines();
+        String currentLine = cursorLine < currentLines.length ? currentLines[cursorLine] : "";
+        String beforeCursor = currentLine.substring(0, Math.min(cursorColumn, currentLine.length()));
+        
+        int cursorXPos = x + PADDING + 30 + font.width(beforeCursor);
+        int autocompleteX = cursorXPos;
+        
+        if (autocompleteX + 250 > x + width) {
+            autocompleteX = x + width - 260;
+        }
+        if (autocompleteX < x + PADDING) {
+            autocompleteX = x + PADDING;
+        }
+        
         int autocompleteY = y + PADDING + (cursorLine - scrollOffset) * LINE_HEIGHT + LINE_HEIGHT + 2;
         
         if (autocompleteY + AUTOCOMPLETE_HEIGHT > y + height) {
             autocompleteY = y + PADDING + (cursorLine - scrollOffset) * LINE_HEIGHT - AUTOCOMPLETE_HEIGHT - 2;
         }
-        
-        graphics.fill(autocompleteX, autocompleteY, autocompleteX + 250, autocompleteY + AUTOCOMPLETE_HEIGHT, 0xEE1a1a1a);
-        
-        int outlineColor = 0xFF666666;
+        if (autocompleteY < y + PADDING) {
+            autocompleteY = y + PADDING;
+        }
+
+        graphics.fill(autocompleteX - 2, autocompleteY - 2, autocompleteX + 252, autocompleteY + AUTOCOMPLETE_HEIGHT + 2, 0xFF000000);
+        graphics.fill(autocompleteX, autocompleteY, autocompleteX + 250, autocompleteY + AUTOCOMPLETE_HEIGHT, 0xEE2D2D2D);
+
+        int outlineColor = 0xFF888888;
         graphics.fill(autocompleteX, autocompleteY, autocompleteX + 1, autocompleteY + AUTOCOMPLETE_HEIGHT, outlineColor);
         graphics.fill(autocompleteX + 249, autocompleteY, autocompleteX + 250, autocompleteY + AUTOCOMPLETE_HEIGHT, outlineColor);
         graphics.fill(autocompleteX, autocompleteY, autocompleteX + 250, autocompleteY + 1, outlineColor);
         graphics.fill(autocompleteX, autocompleteY + AUTOCOMPLETE_HEIGHT - 1, autocompleteX + 250, autocompleteY + AUTOCOMPLETE_HEIGHT, outlineColor);
         
-        int visibleEntries = (AUTOCOMPLETE_HEIGHT - 10) / LINE_HEIGHT;
+        graphics.fill(autocompleteX + 1, autocompleteY + 1, autocompleteX + 2, autocompleteY + AUTOCOMPLETE_HEIGHT - 1, 0xFF444444);
+        graphics.fill(autocompleteX + 248, autocompleteY + 1, autocompleteX + 249, autocompleteY + AUTOCOMPLETE_HEIGHT - 1, 0xFF444444);
+        graphics.fill(autocompleteX + 1, autocompleteY + 1, autocompleteX + 249, autocompleteY + 2, 0xFF444444);
+        graphics.fill(autocompleteX + 1, autocompleteY + AUTOCOMPLETE_HEIGHT - 2, autocompleteX + 249, autocompleteY + AUTOCOMPLETE_HEIGHT - 1, 0xFF444444);
+        
+        int visibleEntries = (AUTOCOMPLETE_HEIGHT - 20) / (LINE_HEIGHT + 2);
         int maxScroll = Math.max(0, autocompleteEntries.size() - visibleEntries);
         autocompleteScroll = Math.max(0, Math.min(autocompleteScroll, maxScroll));
         
         for (int i = autocompleteScroll; i < autocompleteEntries.size() && i < autocompleteScroll + visibleEntries; i++) {
             AutocompleteEntry entry = autocompleteEntries.get(i);
-            int entryY = autocompleteY + 5 + (i - autocompleteScroll) * LINE_HEIGHT;
+            int entryY = autocompleteY + 5 + (i - autocompleteScroll) * (LINE_HEIGHT + 2);
             
-            int color = i == selectedAutocomplete ? 0xFF55FFFF : 0xFFCCCCCC;
+            if (i == selectedAutocomplete) {
+                graphics.fill(autocompleteX + 2, entryY - 1, autocompleteX + 248, entryY + LINE_HEIGHT, 0xFF3D5A80);
+            }
+            
+            int color = i == selectedAutocomplete ? 0xFFFFFFFF : 0xFFB0B0B0;
             graphics.drawString(font, entry.displayText, autocompleteX + 5, entryY, color);
         }
         
         if (!autocompleteEntries.isEmpty() && selectedAutocomplete < autocompleteEntries.size()) {
             AutocompleteEntry entry = autocompleteEntries.get(selectedAutocomplete);
-            graphics.drawString(font, entry.description, autocompleteX + 5, autocompleteY + AUTOCOMPLETE_HEIGHT - 12, 0xFF888888);
+            graphics.fill(autocompleteX, autocompleteY + AUTOCOMPLETE_HEIGHT - 18, autocompleteX + 250, autocompleteY + AUTOCOMPLETE_HEIGHT - 17, 0xFF555555);
+            graphics.drawString(font, entry.description, autocompleteX + 5, autocompleteY + AUTOCOMPLETE_HEIGHT - 14, 0xFFAAAAAA);
         }
     }
     
@@ -347,7 +374,7 @@ public class CodeEditorWidget implements Renderable {
     }
     
     private void updateAutocompleteScroll() {
-        int visibleEntries = (AUTOCOMPLETE_HEIGHT - 10) / LINE_HEIGHT;
+        int visibleEntries = (AUTOCOMPLETE_HEIGHT - 30) / LINE_HEIGHT;
         if (selectedAutocomplete < autocompleteScroll) {
             autocompleteScroll = selectedAutocomplete;
         } else if (selectedAutocomplete >= autocompleteScroll + visibleEntries) {

@@ -44,17 +44,17 @@ public class CommandHandler {
             return 1;
         }
         
-        source.sendFailure(Component.literal("Must be a player to run JS code"));
+        source.sendFailure(Component.translatable("command.eduzscl.js.player_only"));
         return 0;
     }
     
     private static int showHelp(CommandContext<CommandSourceStack> ctx) {
         CommandSourceStack source = ctx.getSource();
-        source.sendSuccess(() -> Component.literal("§6=== JavaScript Teaching Agent ==="), false);
-        source.sendSuccess(() -> Component.literal("§e/js <code> - Run JavaScript code"), false);
-        source.sendSuccess(() -> Component.literal("§e/js help - Show this help"), false);
-        source.sendSuccess(() -> Component.literal("§e/agent open - Open Agent Block GUI"), false);
-        source.sendSuccess(() -> Component.literal("§e/agent debug <x> <y> <z> - Open GUI at position"), false);
+        source.sendSuccess(() -> Component.translatable("command.eduzscl.js.help.header"), false);
+        source.sendSuccess(() -> Component.translatable("command.eduzscl.js.help.js"), false);
+        source.sendSuccess(() -> Component.translatable("command.eduzscl.js.help.help"), false);
+        source.sendSuccess(() -> Component.translatable("command.eduzscl.js.help.open"), false);
+        source.sendSuccess(() -> Component.translatable("command.eduzscl.js.help.debug"), false);
         return 1;
     }
 
@@ -73,18 +73,18 @@ public class CommandHandler {
                     if (blockEntity != null) {
                         player.openMenu(blockEntity);
                     } else {
-                        source.sendFailure(Component.literal("No Agent Block at position"));
+                        source.sendFailure(Component.translatable("command.eduzscl.agent.not_found"));
                     }
                 } else {
-                    source.sendFailure(Component.literal("Not looking at an Agent Block"));
+                    source.sendFailure(Component.translatable("command.eduzscl.agent.not_looking_at_agent"));
                 }
             } else {
-                source.sendFailure(Component.literal("Not looking at a block"));
+                source.sendFailure(Component.translatable("command.eduzscl.agent.not_looking_at_block"));
             }
             return 1;
         }
         
-        source.sendFailure(Component.literal("Must be a player"));
+        source.sendFailure(Component.translatable("command.eduzscl.agent.player_only"));
         return 0;
     }
 
@@ -102,17 +102,17 @@ public class CommandHandler {
                 AgentBlockEntity blockEntity = (AgentBlockEntity) level.getBlockEntity(pos);
                 if (blockEntity != null) {
                     player.openMenu(blockEntity);
-                    source.sendSuccess(() -> Component.literal("Opened Agent GUI at " + x + ", " + y + ", " + z), false);
+                    source.sendSuccess(() -> Component.translatable("command.eduzscl.agent.debug_success", x, y, z), false);
                 } else {
-                    source.sendFailure(Component.literal("No Agent Block at position"));
+                    source.sendFailure(Component.translatable("command.eduzscl.agent.not_found"));
                 }
             } else {
-                source.sendFailure(Component.literal("No Agent Block at " + x + ", " + y + ", " + z));
+                source.sendFailure(Component.translatable("command.eduzscl.agent.not_found"));
             }
             return 1;
         }
         
-        source.sendFailure(Component.literal("Must be a player"));
+        source.sendFailure(Component.translatable("command.eduzscl.agent.player_only"));
         return 0;
     }
 }
