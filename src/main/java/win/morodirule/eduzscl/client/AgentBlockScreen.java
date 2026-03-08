@@ -6,19 +6,23 @@ import net.minecraft.client.gui.screens.inventory.MenuAccess;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
+import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import win.morodirule.eduzscl.menu.AgentBlockMenu;
+import win.morodirule.eduzscl.blockentity.AgentBlockEntity;
 import win.morodirule.eduzscl.teaching.TeachingAgent;
 import win.morodirule.eduzscl.teaching.TeachingAgent.Lesson;
 import win.morodirule.eduzscl.teaching.TeachingAgent.Tip;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMenu> {
     private static final Logger LOGGER = LoggerFactory.getLogger("AgentBlockScreen");
@@ -201,34 +205,104 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
     }
     
     private void applyCurrentLesson() {
-        if (menu != null && menu.getBlockEntity() != null && currentLessonIndex >= 0 && currentLessonIndex < availableLessons.size()) {
-            Lesson lesson = availableLessons.get(currentLessonIndex);
-            menu.getBlockEntity().setCurrentLessonId(lesson.getId());
-        }
+        saveEditorStateToServer(false);
     }
 
     private void runCode() {
-        String code = codeEditor.getText();
-        
-        if (menu != null && menu.getBlockEntity() != null) {
-            menu.getBlockEntity().setCode(code);
-            
-            Minecraft mc = Minecraft.getInstance();
-            net.minecraft.world.entity.player.Player player = mc.player;
-            
-            ServerPlayer serverPlayer = null;
-            if (mc.getSingleplayerServer() != null) {
-                PlayerList playerList = mc.getSingleplayerServer().getPlayerList();
-                serverPlayer = playerList.getPlayer(player.getUUID());
-            }
-            
-            if (serverPlayer == null) {
-                LOGGER.warn("Could not find server player in single player");
+        saveEditorStateToServer(true, true);
+    }
+
+    private void saveEditorStateToServer(boolean includeCode) {
+        saveEditorStateToServer(includeCode, false);
+    }
+
+    private void saveEditorStateToServer(boolean includeCode, boolean runAfterSave) {
+        Minecraft mc = Minecraft.getInstance();
+        MinecraftServer server = mc.getSingleplayerServer();
+        if (server == null) {
+            LOGGER.warn("Singleplayer server is null while Agent screen is open");
+            return;
+        }
+
+        if (mc.player == null) {
+            LOGGER.warn("Local client player is null while Agent screen is open");
+            return;
+        }
+
+        final UUID playerUuid = mc.player.getUUID();
+        final String playerName = mc.player.getGameProfile().getName();
+        final String codeToSave = includeCode && codeEditor != null ? codeEditor.getText() : null;
+        final String lessonIdToSave = currentLessonIndex >= 0 && currentLessonIndex < availableLessons.size()
+            ? availableLessons.get(currentLessonIndex).getId()
+            : null;
+        final BlockPos fallbackPos = this.blockPos;
+
+        server.execute(() -> {
+            PlayerList playerList = server.getPlayerList();
+            if (playerList == null) {
+                LOGGER.warn("PlayerList is null on integrated server thread");
                 return;
             }
-            
-            menu.getBlockEntity().executeCodeFromGui(code, serverPlayer);
+
+            ServerPlayer serverPlayer = playerList.getPlayer(playerUuid);
+            if (serverPlayer == null) {
+                serverPlayer = playerList.getPlayerByName(playerName);
+            }
+            if (serverPlayer == null && !playerList.getPlayers().isEmpty()) {
+                serverPlayer = playerList.getPlayers().get(0);
+            }
+            if (serverPlayer == null) {
+                LOGGER.warn("Could not resolve server player on integrated server thread");
+                return;
+            }
+
+            AgentBlockEntity serverAgent = null;
+            if (serverPlayer.containerMenu instanceof AgentBlockMenu serverMenu) {
+                BlockPos menuPos = serverMenu.getBlockPos();
+                BlockEntity menuBe = serverPlayer.serverLevel().getBlockEntity(menuPos);
+                if (menuBe instanceof AgentBlockEntity agent) {
+                    serverAgent = agent;
+                }
+            }
+
+            if (serverAgent == null && fallbackPos != null && !fallbackPos.equals(BlockPos.ZERO)) {
+                BlockEntity be = serverPlayer.serverLevel().getBlockEntity(fallbackPos);
+                if (be instanceof AgentBlockEntity agent) {
+                    serverAgent = agent;
+                }
+            }
+
+            if (serverAgent == null) {
+                LOGGER.warn("Could not resolve server agent block entity on server thread");
+                return;
+            }
+
+            if (codeToSave != null) {
+                serverAgent.setCode(codeToSave);
+            }
+            if (lessonIdToSave != null) {
+                serverAgent.setCurrentLessonId(lessonIdToSave);
+            }
+
+            if (runAfterSave) {
+                serverAgent.executeCode(serverPlayer);
+            }
+        });
+
+        if (menu != null && menu.getBlockEntity() != null) {
+            if (codeToSave != null) {
+                menu.getBlockEntity().setCode(codeToSave);
+            }
+            if (lessonIdToSave != null) {
+                menu.getBlockEntity().setCurrentLessonId(lessonIdToSave);
+            }
         }
+    }
+
+    @Override
+    public void onClose() {
+        saveEditorStateToServer(true);
+        super.onClose();
     }
 
     private void renderSidebar(GuiGraphics graphics, int windowX, int windowY) {

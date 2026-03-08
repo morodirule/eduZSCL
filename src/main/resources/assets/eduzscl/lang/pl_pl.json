@@ -11,10 +11,7 @@
   "gui.eduzscl.agent_editor.goal": "Cel:",
   "gui.eduzscl.agent_editor.tips": "Wskazówki:",
   "gui.eduzscl.agent_editor.code_editor": "Edytor Kodu",
-  "gui.eduzscl.agent_editor.default_code": "// Napisz swój kod tutaj
-console.log("Witaj, Agencie!");
-agent.move(1);
-",
+  "gui.eduzscl.agent_editor.default_code": "// Napisz swój kod tutaj\nconsole.log(\"Witaj, Agencie!\");\nagent.move(1);\n",
   "command.eduzscl.js.player_only": "Musisz być graczem, aby uruchomić kod JS",
   "command.eduzscl.js.help.header": "§6=== Edukacyjny Agent JavaScript ===",
   "command.eduzscl.js.help.js": "§e/js <kod> - Uruchamia kod JavaScript",

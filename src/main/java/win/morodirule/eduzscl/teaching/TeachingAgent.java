@@ -81,6 +81,8 @@ public class TeachingAgent {
         } catch (Exception e) {
             sendMessageToPlayer(player, "§cError: " + e.getMessage());
             LOGGER.error("JS Execution error for {}: {}", player.getName().getString(), e.getMessage());
+        } finally {
+            setCurrentPlayer(null);
         }
     }
     

@@ -1,6 +1,5 @@
 package win.morodirule.eduzscl.api;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
@@ -18,7 +17,6 @@ import win.morodirule.eduzscl.blockentity.AgentBlockEntity;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 
 public class AgentAPI {
     private static final Logger LOGGER = LoggerFactory.getLogger("AgentAPI");
@@ -33,6 +31,17 @@ public class AgentAPI {
 
     private boolean checkOperations() {
         return agentBlock.incrementOperations();
+    }
+
+    private Level resolveLevel() {
+        Level level = agentBlock.getLevel();
+        if (level == null) {
+            return null;
+        }
+        if (!level.isClientSide) {
+            return level;
+        }
+        return player != null && player.getServer() != null ? player.serverLevel() : null;
     }
 
     public void log(Object... args) {
@@ -50,7 +59,7 @@ public class AgentAPI {
         BlockPos current = agentBlock.getAgentPosition();
         BlockPos newPos = new BlockPos(x, current.getY(), current.getZ());
         
-        Level level = agentBlock.getLevel();
+        Level level = resolveLevel();
         if (level == null) return "No world";
         
         BlockState state = level.getBlockState(newPos);
@@ -68,7 +77,7 @@ public class AgentAPI {
         BlockPos current = agentBlock.getAgentPosition();
         BlockPos newPos = new BlockPos(current.getX(), y, current.getZ());
         
-        Level level = agentBlock.getLevel();
+        Level level = resolveLevel();
         if (level == null) return "No world";
         
         BlockState state = level.getBlockState(newPos);
@@ -86,7 +95,7 @@ public class AgentAPI {
         BlockPos current = agentBlock.getAgentPosition();
         BlockPos newPos = new BlockPos(current.getX(), current.getY(), z);
         
-        Level level = agentBlock.getLevel();
+        Level level = resolveLevel();
         if (level == null) return "No world";
         
         BlockState state = level.getBlockState(newPos);
@@ -103,7 +112,7 @@ public class AgentAPI {
         
         BlockPos newPos = new BlockPos(x, y, z);
         
-        Level level = agentBlock.getLevel();
+        Level level = resolveLevel();
         if (level == null) return "No world";
         
         BlockState state = level.getBlockState(newPos);
@@ -120,7 +129,7 @@ public class AgentAPI {
         
         if (steps < 1 || steps > 100) return "Steps must be between 1 and 100";
         
-        Level level = agentBlock.getLevel();
+        Level level = resolveLevel();
         if (level == null) return "No world";
         
         Direction dir = agentBlock.getAgentDirection();
@@ -170,13 +179,9 @@ public class AgentAPI {
     public String place(String blockId) {
         if (!checkOperations()) return "Operation limit exceeded";
 
-        Level level = agentBlock.getLevel();
+        Level level = resolveLevel();
 
         if (level == null) return "No world";
-
-        if (level.isClientSide){
-            level = Objects.requireNonNull(this.player.getServer()).getLevel(level.dimension()).getLevel();
-        }
 
         BlockPos forward = agentBlock.getAgentPosition().relative(agentBlock.getAgentDirection());
         
@@ -196,7 +201,7 @@ public class AgentAPI {
     public String placeDown(String blockId) {
         if (!checkOperations()) return "Operation limit exceeded";
         
-        Level level = agentBlock.getLevel();
+        Level level = resolveLevel();
         if (level == null) return "No world";
         
         BlockPos down = agentBlock.getAgentPosition().below();
@@ -217,7 +222,7 @@ public class AgentAPI {
     public String placeUp(String blockId) {
         if (!checkOperations()) return "Operation limit exceeded";
         
-        Level level = agentBlock.getLevel();
+        Level level = resolveLevel();
         if (level == null) return "No world";
         
         BlockPos up = agentBlock.getAgentPosition().above();
@@ -238,7 +243,7 @@ public class AgentAPI {
     public String remove() {
         if (!checkOperations()) return "Operation limit exceeded";
         
-        Level level = agentBlock.getLevel();
+        Level level = resolveLevel();
         if (level == null) return "No world";
         
         BlockPos forward = agentBlock.getAgentPosition().relative(agentBlock.getAgentDirection());
@@ -254,7 +259,7 @@ public class AgentAPI {
     public String removeDown() {
         if (!checkOperations()) return "Operation limit exceeded";
         
-        Level level = agentBlock.getLevel();
+        Level level = resolveLevel();
         if (level == null) return "No world";
         
         BlockPos down = agentBlock.getAgentPosition().below();

@@ -151,6 +151,8 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
         
         executingPlayer = serverPlayer;
         executionCount = 0;
+        this.code = code;
+        setChanged();
         agentPosition = this.worldPosition;
         
         TeachingAgent.setCurrentPlayer(serverPlayer);
@@ -208,15 +210,16 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
 
     public AgentBlockEntity setAgentPosition(BlockPos pos) {
         Level level = this.getLevel();
-
-
         if (level == null) {
             this.agentPosition = pos;
             setChanged();
             return this;
         }
-        if (level.isClientSide){
-            level = Objects.requireNonNull(this.executingPlayer.getServer()).getLevel(level.dimension()).getLevel();
+
+        if (level.isClientSide) {
+            this.agentPosition = pos;
+            setChanged();
+            return this;
         }
 
         if (pos.equals(this.worldPosition)) {
@@ -298,8 +301,9 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
         if (level != null && worldPosition != null) {
             BlockState state = level.getBlockState(worldPosition);
             if (state.hasProperty(AgentBlock.FACING)) {
-                if (level.isClientSide()){
-                    level = Objects.requireNonNull(this.executingPlayer.getServer()).getLevel(level.dimension()).getLevel();
+                if (level.isClientSide) {
+                    setChanged();
+                    return;
                 }
                 level.setBlock(worldPosition, state.setValue(AgentBlock.FACING, direction), 3);
             }
@@ -312,8 +316,9 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
         if (level != null && worldPosition != null) {
             BlockState state = level.getBlockState(worldPosition);
             if (state.hasProperty(AgentBlock.FACING)) {
-                if (level.isClientSide()){
-                    level = Objects.requireNonNull(this.executingPlayer.getServer()).getLevel(level.dimension()).getLevel();
+                if (level.isClientSide) {
+                    setChanged();
+                    return;
                 }
                 level.setBlock(worldPosition, state.setValue(AgentBlock.FACING, this.direction), 3);
             }
@@ -326,8 +331,9 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
         if (level != null && worldPosition != null) {
             BlockState state = level.getBlockState(worldPosition);
             if (state.hasProperty(AgentBlock.FACING)) {
-                if (level.isClientSide()){
-                    level = Objects.requireNonNull(this.executingPlayer.getServer()).getLevel(level.dimension()).getLevel();
+                if (level.isClientSide) {
+                    setChanged();
+                    return;
                 }
                 level.setBlock(worldPosition, state.setValue(AgentBlock.FACING, this.direction), 3);
             }
