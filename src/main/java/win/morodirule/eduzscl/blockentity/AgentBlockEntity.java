@@ -32,6 +32,7 @@ import win.morodirule.eduzscl.teaching.TeachingAgent.Lesson;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 public class AgentBlockEntity extends BlockEntity implements MenuProvider {
     private static final Logger LOGGER = LoggerFactory.getLogger("AgentBlockEntity");
@@ -40,6 +41,7 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
     private static final String AGENT_Y_KEY = "agentY";
     private static final String AGENT_Z_KEY = "agentZ";
     private static final String CURRENT_LESSON_KEY = "currentLesson";
+    public static final long STEP_DELAY_MS = 500L;
     
     private String code = "// Write your code here\nconsole.log(\"Hello, Agent!\");\nagent.move(1);\n";
     private Direction direction = Direction.NORTH;
@@ -48,6 +50,7 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
     private static final int MAX_OPERATIONS = 100;
     private ServerPlayer executingPlayer;
     private String currentLessonId = null;
+    private volatile boolean executionInProgress = false;
 
     public AgentBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.AGENT_BLOCK_ENTITY.get(), pos, state);
@@ -110,34 +113,15 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
     }
 
     public void executeCode(ServerPlayer player) {
+        if (executionInProgress) {
+            TeachingAgent.sendMessageToPlayer(player, "§eAgent is already executing code.");
+            return;
+        }
+
         executingPlayer = player;
         executionCount = 0;
-        
         agentPosition = this.worldPosition;
-        
-        TeachingAgent.setCurrentPlayer(player);
-        
-        Lesson lesson = getCurrentLesson();
-        
-        try {
-            RhinoContext rhino = new RhinoContext(lesson);
-            Scriptable scope = rhino.getRuntime().initStandardObjects();
-            rhino.setupGlobals(scope);
-            
-            AgentAPI agentApi = new AgentAPI(this, player);
-            ScriptableObject.putProperty(scope, "agent", agentApi, rhino.getRuntime());
-            
-            rhino.execute(code, scope);
-            
-        } catch (Exception e) {
-            if (executingPlayer != null) {
-                TeachingAgent.sendMessageToPlayer(executingPlayer, "§cError: " + e.getMessage());
-            }
-            LOGGER.error("Agent code execution error: {}", e.getMessage());
-        } finally {
-            executingPlayer = null;
-            TeachingAgent.setCurrentPlayer(null);
-        }
+        startExecutionAsync(player, this.code);
     }
 
     public String executeCodeFromGui(String code, Player player) {
@@ -149,36 +133,17 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
             return "Must be on server to execute code";
         }
         
-        executingPlayer = serverPlayer;
-        executionCount = 0;
         this.code = code;
         setChanged();
-        agentPosition = this.worldPosition;
-        
-        TeachingAgent.setCurrentPlayer(serverPlayer);
-        
-        Lesson lesson = getCurrentLesson();
-        
-        try {
-            RhinoContext rhino = new RhinoContext(lesson);
-            Scriptable scope = rhino.getRuntime().initStandardObjects();
-            rhino.setupGlobals(scope);
-            
-            AgentAPI agentApi = new AgentAPI(this, serverPlayer);
-            ScriptableObject.putProperty(scope, "agent", agentApi, rhino.getRuntime());
-            
-            rhino.execute(code, scope);
-            
-            return "Code executed successfully";
-            
-        } catch (Exception e) {
-            String error = "Error: " + e.getMessage();
-            TeachingAgent.sendMessageToPlayer(serverPlayer, "§c" + error);
-            return error;
-        } finally {
-            executingPlayer = null;
-            TeachingAgent.setCurrentPlayer(null);
+        if (executionInProgress) {
+            return "Agent is already executing code";
         }
+
+        executingPlayer = serverPlayer;
+        executionCount = 0;
+        agentPosition = this.worldPosition;
+        startExecutionAsync(serverPlayer, code);
+        return "Code execution started";
     }
 
     public void sendMessage(String message) {
@@ -199,6 +164,45 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
 
     public void setExecutingPlayer(ServerPlayer player) {
         this.executingPlayer = player;
+    }
+
+    public boolean waitForNextStep() {
+        try {
+            Thread.sleep(STEP_DELAY_MS);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            sendMessage("§cExecution interrupted.");
+            return false;
+        }
+    }
+
+    private void startExecutionAsync(ServerPlayer player, String codeToRun) {
+        executionInProgress = true;
+        CompletableFuture.runAsync(() -> {
+            TeachingAgent.setCurrentPlayer(player);
+            Lesson lesson = getCurrentLesson();
+
+            try {
+                RhinoContext rhino = new RhinoContext(lesson);
+                Scriptable scope = rhino.getRuntime().initStandardObjects();
+                rhino.setupGlobals(scope);
+
+                AgentAPI agentApi = new AgentAPI(this, player);
+                ScriptableObject.putProperty(scope, "agent", agentApi, rhino.getRuntime());
+
+                rhino.execute(codeToRun, scope);
+            } catch (Exception e) {
+                if (executingPlayer != null) {
+                    TeachingAgent.sendMessageToPlayer(executingPlayer, "§cError: " + e.getMessage());
+                }
+                LOGGER.error("Agent code execution error: {}", e.getMessage());
+            } finally {
+                executionInProgress = false;
+                executingPlayer = null;
+                TeachingAgent.setCurrentPlayer(null);
+            }
+        });
     }
 
     public BlockPos getAgentPosition() {

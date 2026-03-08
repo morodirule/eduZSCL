@@ -18,9 +18,25 @@ public class TeachingAgent {
     private static final List<Lesson> lessons = new ArrayList<>();
     
     static {
-        Lesson001_HelloWorld lesson001 = new Lesson001_HelloWorld();
-        lessons.add(lesson001);
-        LessonManager.registerLesson(lesson001);
+        registerBuiltInLessons();
+        loadJsonLessons();
+    }
+
+    private static void registerBuiltInLessons() {
+        registerLesson(new Lesson001_HelloWorld());
+    }
+
+    private static void loadJsonLessons() {
+        List<Lesson> jsonLessons = JsonLessonLoader.loadLessons();
+        for (Lesson lesson : jsonLessons) {
+            registerLesson(lesson);
+        }
+    }
+
+    private static void registerLesson(Lesson lesson) {
+        lessons.removeIf(existing -> existing.getId().equals(lesson.getId()));
+        lessons.add(lesson);
+        LessonManager.registerLesson(lesson);
     }
     
     public static void setCurrentPlayer(ServerPlayer player) {
@@ -101,7 +117,7 @@ public class TeachingAgent {
     }
     
     public static List<Lesson> getLessons() {
-        return lessons;
+        return new ArrayList<>(lessons);
     }
     
     public interface Lesson {
@@ -116,10 +132,17 @@ public class TeachingAgent {
         String getNextStep();
         default int getMaxOperations() { return 100; }
         default Tip[] getTips() { return new Tip[0]; }
+        default List<LessonApiCall> getAllowedApiCalls() { return null; }
     }
     
     public record Tip(String text, String category) {
         public Tip(String text) { this(text, "general"); }
+    }
+
+    public record LessonApiCall(String name, String insertText, String description) {
+        public LessonApiCall(String name) {
+            this(name, null, null);
+        }
     }
     
     public record PracticeTask(String type, String prompt, String expectedOutcome) {}
@@ -138,7 +161,7 @@ public class TeachingAgent {
         }
         
         public static List<Lesson> getAllLessons() {
-            return new ArrayList<>(lessonRegistry.values());
+            return new ArrayList<>(lessons);
         }
         
         public static void setPlayerLesson(UUID playerId, String lessonId) {
@@ -157,7 +180,7 @@ public class TeachingAgent {
         }
         
         public static Lesson getDefaultLesson() {
-            return lessonRegistry.isEmpty() ? null : lessonRegistry.values().iterator().next();
+            return lessons.isEmpty() ? null : lessons.getFirst();
         }
     }
     

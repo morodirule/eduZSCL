@@ -5,10 +5,13 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
+import win.morodirule.eduzscl.teaching.TeachingAgent;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -66,6 +69,8 @@ public class CodeEditorWidget implements Renderable {
         new APIEntry("Math.random", "Math.random()", "Random number 0-1"),
         new APIEntry("agent.log", "agent.log(msg)", "Log message")
     );
+    private static final Map<String, APIEntry> API_ENTRIES_BY_NAME = createApiEntryMap();
+    private List<APIEntry> activeApiEntries = API_ENTRIES;
     
     public CodeEditorWidget(Font font, int x, int y, int width, int height) {
         this.font = font;
@@ -73,6 +78,31 @@ public class CodeEditorWidget implements Renderable {
         this.y = y;
         this.width = width;
         this.height = height;
+    }
+
+    public void setAllowedApiCalls(List<TeachingAgent.LessonApiCall> allowedApiCalls) {
+        if (allowedApiCalls == null) {
+            this.activeApiEntries = API_ENTRIES;
+            return;
+        }
+
+        List<APIEntry> filtered = new ArrayList<>();
+        for (TeachingAgent.LessonApiCall call : allowedApiCalls) {
+            if (call == null || call.name() == null || call.name().isBlank()) {
+                continue;
+            }
+            APIEntry builtin = API_ENTRIES_BY_NAME.get(call.name());
+            if (builtin != null) {
+                filtered.add(builtin);
+                continue;
+            }
+
+            String insertText = call.insertText() != null ? call.insertText() : call.name();
+            String description = call.description() != null ? call.description() : "lesson api";
+            filtered.add(new APIEntry(call.name(), insertText, description));
+        }
+
+        this.activeApiEntries = filtered;
     }
     
     public String getText() {
@@ -237,8 +267,10 @@ public class CodeEditorWidget implements Renderable {
     }
     
     public void handleBackspace() {
+        updateCursorPosition();
+        String[] lines = getLines();
+
         if (cursorColumn > 0) {
-            String[] lines = getLines();
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < lines.length; i++) {
                 if (i == cursorLine) {
@@ -253,27 +285,32 @@ public class CodeEditorWidget implements Renderable {
             text = sb;
             cursorColumn--;
         } else if (cursorLine > 0) {
-            String[] lines = getLines();
             int prevLineLength = lines[cursorLine - 1].length();
-            
-            StringBuilder sb = new StringBuilder();
+
+            String[] newLines = new String[lines.length - 1];
+            int newIdx = 0;
             for (int i = 0; i < lines.length; i++) {
                 if (i == cursorLine - 1) {
-                    sb.append(lines[i]);
-                } else if (i == cursorLine) {
-                    if (i < lines.length) {
-                        if (i > 0) sb.append("\n");
-                        sb.append(lines[i]);
-                    }
-                } else {
-                    if (i > 0) sb.append("\n");
-                    sb.append(lines[i]);
+                    newLines[newIdx++] = lines[i] + lines[i + 1];
+                } else if (i != cursorLine) {
+                    newLines[newIdx++] = lines[i];
                 }
             }
+
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < newLines.length; i++) {
+                sb.append(newLines[i]);
+                if (i < newLines.length - 1) {
+                    sb.append("\n");
+                }
+            }
+
             text = sb;
             cursorLine--;
             cursorColumn = prevLineLength;
         }
+
+        updateCursorPosition();
     }
     
     public void handleDelete() {
@@ -392,7 +429,7 @@ public class CodeEditorWidget implements Renderable {
         autocompleteEntries.clear();
         String lowerWord = currentWord.toLowerCase();
         
-        for (APIEntry api : API_ENTRIES) {
+        for (APIEntry api : activeApiEntries) {
             if (api.name.toLowerCase().startsWith(lowerWord)) {
                 autocompleteEntries.add(new AutocompleteEntry(api.name, api.insertText, api.description));
             }
@@ -637,5 +674,13 @@ public class CodeEditorWidget implements Renderable {
             this.insertText = insertText;
             this.description = description;
         }
+    }
+
+    private static Map<String, APIEntry> createApiEntryMap() {
+        Map<String, APIEntry> map = new HashMap<>();
+        for (APIEntry entry : API_ENTRIES) {
+            map.put(entry.name, entry);
+        }
+        return map;
     }
 }

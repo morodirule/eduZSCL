@@ -23,6 +23,7 @@ public class AgentBlockMenu extends AbstractContainerMenu {
     private static final Logger LOGGER = LoggerFactory.getLogger("AgentBlockMenu");
     private static final Map<Integer, BlockPos> MENU_ID_TO_POS = new ConcurrentHashMap<>();
     private static final Map<Integer, String> MENU_ID_TO_CODE = new ConcurrentHashMap<>();
+    private static final Map<Integer, String> MENU_ID_TO_LESSON = new ConcurrentHashMap<>();
     
     public static AgentBlockMenu create(int id, Inventory playerInventory) {
         return new AgentBlockMenu(id, playerInventory);
@@ -32,8 +33,10 @@ public class AgentBlockMenu extends AbstractContainerMenu {
         super(ModMenus.AGENT_BLOCK_MENU.get(), id);
         BlockPos pos = MENU_ID_TO_POS.remove(id);
         String cachedCode = MENU_ID_TO_CODE.remove(id);
+        String cachedLessonId = MENU_ID_TO_LESSON.remove(id);
         this.blockPos = pos != null ? pos : BlockPos.ZERO;
         this.cachedCode = cachedCode;
+        this.cachedLessonId = cachedLessonId;
         LOGGER.info("AgentBlockMenu client constructor - id: {}, blockPos: {}, cachedCode present: {}", id, this.blockPos, cachedCode != null);
         
         if (this.blockPos != BlockPos.ZERO && playerInventory.player != null && 
@@ -61,6 +64,7 @@ public class AgentBlockMenu extends AbstractContainerMenu {
         // Cache the code so the client receives it even if the block entity NBT hasn't synced yet
         if (this.blockEntity instanceof AgentBlockEntity agent) {
             MENU_ID_TO_CODE.put(id, agent.getCode());
+            MENU_ID_TO_LESSON.put(id, agent.getCurrentLessonId());
             LOGGER.info("Cached code for menu id {}: length = {}", id, agent.getCode().length());
         }
     }
@@ -68,6 +72,7 @@ public class AgentBlockMenu extends AbstractContainerMenu {
     private BlockPos blockPos;
     private AgentBlockEntity blockEntity;
     private String cachedCode;
+    private String cachedLessonId;
 
     public BlockPos getBlockPos() {
         return blockPos;
@@ -79,6 +84,10 @@ public class AgentBlockMenu extends AbstractContainerMenu {
     
     public String getCachedCode() {
         return cachedCode;
+    }
+
+    public String getCachedLessonId() {
+        return cachedLessonId;
     }
 
     @Override

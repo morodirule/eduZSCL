@@ -20,7 +20,6 @@ import win.morodirule.eduzscl.teaching.TeachingAgent;
 import win.morodirule.eduzscl.teaching.TeachingAgent.Lesson;
 import win.morodirule.eduzscl.teaching.TeachingAgent.Tip;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -40,8 +39,6 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
     private Button runButton;
     private Button resetButton;
     private Button closeButton;
-    private Button lessonPrevButton;
-    private Button lessonNextButton;
     private AgentBlockMenu menu;
     private int currentLessonIndex = 0;
     private List<Lesson> availableLessons;
@@ -96,9 +93,16 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
             availableLessons = TeachingAgent.getLessons();
         }
         
-        if (menu != null && menu.getBlockEntity() != null && menu.getBlockEntity().getCurrentLessonId() != null) {
+        String selectedLessonId = null;
+        if (menu != null && menu.getCachedLessonId() != null) {
+            selectedLessonId = menu.getCachedLessonId();
+        } else if (menu != null && menu.getBlockEntity() != null) {
+            selectedLessonId = menu.getBlockEntity().getCurrentLessonId();
+        }
+
+        if (selectedLessonId != null) {
             for (int i = 0; i < availableLessons.size(); i++) {
-                if (availableLessons.get(i).getId().equals(menu.getBlockEntity().getCurrentLessonId())) {
+                if (availableLessons.get(i).getId().equals(selectedLessonId)) {
                     currentLessonIndex = i;
                     break;
                 }
@@ -122,6 +126,7 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
                 textFieldWidth,
                 textFieldHeight
         );
+        applyLessonAutocompleteFilter();
         
         // Try to get the code from cached menu data first (for fresh block entities after moves)
         // Fall back to block entity code if cache is empty
@@ -162,32 +167,6 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
         ).bounds(codeAreaCenterX - BUTTON_WIDTH / 2, buttonY + BUTTON_HEIGHT + 5, BUTTON_WIDTH, BUTTON_HEIGHT).build();
         this.addRenderableWidget(closeButton);
 
-        
-        int sidebarX = windowX + TEXT_FIELD_MARGIN;
-        
-        this.lessonPrevButton = Button.builder(
-                Component.literal("<"),
-                button -> {
-                    if (currentLessonIndex > 0) {
-                        currentLessonIndex--;
-                        updateLessonInfo();
-                        applyCurrentLesson();
-                    }
-                }
-        ).bounds(sidebarX, windowY + 30, 25, BUTTON_HEIGHT).build();
-        this.addRenderableWidget(lessonPrevButton);
-        
-        this.lessonNextButton = Button.builder(
-                Component.literal(">"),
-                button -> {
-                    if (currentLessonIndex < availableLessons.size() - 1) {
-                        currentLessonIndex++;
-                        updateLessonInfo();
-                        applyCurrentLesson();
-                    }
-                }
-        ).bounds(sidebarX + SIDEBAR_WIDTH - 25, windowY + 30, 25, BUTTON_HEIGHT).build();
-        this.addRenderableWidget(lessonNextButton);
     }
     
     private void updateLessonInfo() {
@@ -201,15 +180,26 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
                 sb.append("- ").append(tip.text()).append("\n");
             }
             currentTips = sb.toString();
+            applyLessonAutocompleteFilter();
         }
     }
-    
-    private void applyCurrentLesson() {
-        saveEditorStateToServer(false);
-    }
 
+    private void applyLessonAutocompleteFilter() {
+        if (codeEditor == null || currentLessonIndex < 0 || currentLessonIndex >= availableLessons.size()) {
+            return;
+        }
+        Lesson lesson = availableLessons.get(currentLessonIndex);
+        codeEditor.setAllowedApiCalls(lesson.getAllowedApiCalls());
+    }
+    
     private void runCode() {
         saveEditorStateToServer(true, true);
+        if (this.minecraft != null && this.minecraft.player != null) {
+            this.minecraft.player.closeContainer();
+        }
+        if (this.minecraft != null) {
+            this.minecraft.setScreen(null);
+        }
     }
 
     private void saveEditorStateToServer(boolean includeCode) {
@@ -232,9 +222,6 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
         final UUID playerUuid = mc.player.getUUID();
         final String playerName = mc.player.getGameProfile().getName();
         final String codeToSave = includeCode && codeEditor != null ? codeEditor.getText() : null;
-        final String lessonIdToSave = currentLessonIndex >= 0 && currentLessonIndex < availableLessons.size()
-            ? availableLessons.get(currentLessonIndex).getId()
-            : null;
         final BlockPos fallbackPos = this.blockPos;
 
         server.execute(() -> {
@@ -280,10 +267,6 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
             if (codeToSave != null) {
                 serverAgent.setCode(codeToSave);
             }
-            if (lessonIdToSave != null) {
-                serverAgent.setCurrentLessonId(lessonIdToSave);
-            }
-
             if (runAfterSave) {
                 serverAgent.executeCode(serverPlayer);
             }
@@ -292,9 +275,6 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
         if (menu != null && menu.getBlockEntity() != null) {
             if (codeToSave != null) {
                 menu.getBlockEntity().setCode(codeToSave);
-            }
-            if (lessonIdToSave != null) {
-                menu.getBlockEntity().setCurrentLessonId(lessonIdToSave);
             }
         }
     }
