@@ -157,6 +157,9 @@ public class CodeEditorWidget implements Renderable {
     }
     
     private void renderAutocomplete(GuiGraphics graphics, int mouseX, int mouseY) {
+        graphics.pose().pushPose();
+        // Ensure the autocomplete panel renders above editor text.
+        graphics.pose().translate(0, 0, 200);
         String[] currentLines = getLines();
         String currentLine = cursorLine < currentLines.length ? currentLines[cursorLine] : "";
         String beforeCursor = currentLine.substring(0, Math.min(cursorColumn, currentLine.length()));
@@ -181,7 +184,8 @@ public class CodeEditorWidget implements Renderable {
         }
 
         graphics.fill(autocompleteX - 2, autocompleteY - 2, autocompleteX + 252, autocompleteY + AUTOCOMPLETE_HEIGHT + 2, 0xFF000000);
-        graphics.fill(autocompleteX, autocompleteY, autocompleteX + 250, autocompleteY + AUTOCOMPLETE_HEIGHT, 0xEE2D2D2D);
+        // Use fully opaque background so editor text never bleeds through the autocomplete panel.
+        graphics.fill(autocompleteX, autocompleteY, autocompleteX + 250, autocompleteY + AUTOCOMPLETE_HEIGHT, 0xFF2D2D2D);
 
         int outlineColor = 0xFF888888;
         graphics.fill(autocompleteX, autocompleteY, autocompleteX + 1, autocompleteY + AUTOCOMPLETE_HEIGHT, outlineColor);
@@ -215,6 +219,7 @@ public class CodeEditorWidget implements Renderable {
             graphics.fill(autocompleteX, autocompleteY + AUTOCOMPLETE_HEIGHT - 18, autocompleteX + 250, autocompleteY + AUTOCOMPLETE_HEIGHT - 17, 0xFF555555);
             graphics.drawString(font, entry.description, autocompleteX + 5, autocompleteY + AUTOCOMPLETE_HEIGHT - 14, 0xFFAAAAAA);
         }
+        graphics.pose().popPose();
     }
     
     private String[] getLines() {
