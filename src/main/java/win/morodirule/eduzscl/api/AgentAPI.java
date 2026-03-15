@@ -14,8 +14,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import win.morodirule.eduzscl.blockentity.AgentBlockEntity;
+import win.morodirule.eduzscl.teaching.TeachingAgent;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -26,10 +28,12 @@ public class AgentAPI {
     
     private AgentBlockEntity agentBlock;
     private final ServerPlayer player;
+    private final TeachingAgent.Lesson lesson;
 
-    public AgentAPI(AgentBlockEntity agentBlock, ServerPlayer player) {
+    public AgentAPI(AgentBlockEntity agentBlock, ServerPlayer player, TeachingAgent.Lesson lesson) {
         this.agentBlock = agentBlock;
         this.player = player;
+        this.lesson = lesson;
     }
 
     private boolean checkOperations() {
@@ -370,6 +374,12 @@ public class AgentAPI {
                 return "No block to remove";
             }
 
+            BlockState state = level.getBlockState(forward);
+            if (!isBlockRemovable(state)) {
+                String blockName = state.getBlock().getName().getString();
+                return "Block not allowed to remove: " + blockName;
+            }
+
             level.setBlock(forward, Blocks.AIR.defaultBlockState(), 3);
             return "Removed block at forward position";
         }, "No server");
@@ -393,6 +403,12 @@ public class AgentAPI {
                 return "No block to remove";
             }
 
+            BlockState state = level.getBlockState(down);
+            if (!isBlockRemovable(state)) {
+                String blockName = state.getBlock().getName().getString();
+                return "Block not allowed to remove: " + blockName;
+            }
+
             level.setBlock(down, Blocks.AIR.defaultBlockState(), 3);
             return "Removed block below";
         }, "No server");
@@ -401,6 +417,17 @@ public class AgentAPI {
             if (!agentBlock.waitForNextStep()) return "Execution interrupted";
         }
         return result;
+    }
+
+    private boolean isBlockRemovable(BlockState state) {
+        List<String> allowedBlocks = lesson != null ? lesson.getAllowedBlocks() : null;
+        if (allowedBlocks == null || allowedBlocks.isEmpty()) {
+            return true;
+        }
+
+        ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        String blockIdStr = blockId.toString();
+        return allowedBlocks.contains(blockIdStr);
     }
 
     public Map<String, Object> getPosition() {

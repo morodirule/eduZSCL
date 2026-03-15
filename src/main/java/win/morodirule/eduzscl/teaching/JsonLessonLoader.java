@@ -47,7 +47,14 @@ public final class JsonLessonLoader {
   "allowedApiCalls": [
     "console.log",
     "agent.move",
-    "agent.turnLeft"
+    "agent.turnLeft",
+    "agent.remove",
+    "agent.removeDown"
+  ],
+  "allowedBlocks": [
+    "minecraft:stone",
+    "minecraft:dirt",
+    "minecraft:grass_block"
   ]
 }
 """;
@@ -138,6 +145,7 @@ public final class JsonLessonLoader {
         TeachingAgent.Hint[] hints = parseHints(root.getAsJsonArray("hints"));
         TeachingAgent.Tip[] tips = parseTips(root.getAsJsonArray("tips"));
         List<TeachingAgent.LessonApiCall> allowedApiCalls = parseAllowedApiCalls(root);
+        List<String> allowedBlocks = parseAllowedBlocks(root);
 
         return new JsonLesson(
             id,
@@ -151,7 +159,8 @@ public final class JsonLessonLoader {
             nextStep,
             maxOperations,
             tips,
-            allowedApiCalls
+            allowedApiCalls,
+            allowedBlocks
         );
     }
 
@@ -249,6 +258,28 @@ public final class JsonLessonLoader {
         return List.copyOf(calls);
     }
 
+    private static List<String> parseAllowedBlocks(JsonObject root) {
+        if (root == null || !root.has("allowedBlocks") || root.get("allowedBlocks").isJsonNull()) {
+            return null;
+        }
+
+        JsonArray array = root.getAsJsonArray("allowedBlocks");
+        if (array == null) {
+            return List.of();
+        }
+
+        List<String> blocks = new ArrayList<>();
+        for (JsonElement element : array) {
+            if (element.isJsonPrimitive()) {
+                String blockId = element.getAsString();
+                if (!blockId.isBlank()) {
+                    blocks.add(blockId.contains(":") ? blockId : "minecraft:" + blockId);
+                }
+            }
+        }
+        return List.copyOf(blocks);
+    }
+
     private static String getRequiredString(JsonObject obj, String key, Path path) {
         String value = getNullableString(obj, key);
         if (value == null || value.isBlank()) {
@@ -295,6 +326,7 @@ public final class JsonLessonLoader {
         private final int maxOperations;
         private final TeachingAgent.Tip[] tips;
         private final List<TeachingAgent.LessonApiCall> allowedApiCalls;
+        private final List<String> allowedBlocks;
 
         private JsonLesson(
             String id,
@@ -308,7 +340,8 @@ public final class JsonLessonLoader {
             String nextStep,
             int maxOperations,
             TeachingAgent.Tip[] tips,
-            List<TeachingAgent.LessonApiCall> allowedApiCalls
+            List<TeachingAgent.LessonApiCall> allowedApiCalls,
+            List<String> allowedBlocks
         ) {
             this.id = id;
             this.title = title;
@@ -322,6 +355,7 @@ public final class JsonLessonLoader {
             this.maxOperations = maxOperations;
             this.tips = tips;
             this.allowedApiCalls = allowedApiCalls;
+            this.allowedBlocks = allowedBlocks;
         }
 
         @Override
@@ -382,6 +416,11 @@ public final class JsonLessonLoader {
         @Override
         public List<TeachingAgent.LessonApiCall> getAllowedApiCalls() {
             return allowedApiCalls;
+        }
+
+        @Override
+        public List<String> getAllowedBlocks() {
+            return allowedBlocks;
         }
     }
 }

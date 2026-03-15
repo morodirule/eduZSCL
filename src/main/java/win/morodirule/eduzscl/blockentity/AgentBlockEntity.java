@@ -188,7 +188,7 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
                 Scriptable scope = rhino.getRuntime().initStandardObjects();
                 rhino.setupGlobals(scope);
 
-                AgentAPI agentApi = new AgentAPI(this, player);
+                AgentAPI agentApi = new AgentAPI(this, player, lesson);
                 ScriptableObject.putProperty(scope, "agent", agentApi, rhino.getRuntime());
 
                 rhino.execute(codeToRun, scope);

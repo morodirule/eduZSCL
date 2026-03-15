@@ -133,6 +133,7 @@ public class TeachingAgent {
         default int getMaxOperations() { return 100; }
         default Tip[] getTips() { return new Tip[0]; }
         default List<LessonApiCall> getAllowedApiCalls() { return null; }
+        default List<String> getAllowedBlocks() { return null; }
     }
     
     public record Tip(String text, String category) {
