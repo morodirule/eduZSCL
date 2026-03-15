@@ -15,5 +15,5 @@ public class ModBlocks {
             BlockBehaviour.Properties.of().mapColor(MapColor.STONE));
 
     public static final DeferredBlock<AgentBlock> AGENT_BLOCK = BLOCKS.registerBlock("agent_block", AgentBlock::new,
-            BlockBehaviour.Properties.of());
+            BlockBehaviour.Properties.of().noOcclusion());
 }
