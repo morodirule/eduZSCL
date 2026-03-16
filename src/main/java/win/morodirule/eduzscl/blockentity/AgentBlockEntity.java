@@ -15,7 +15,6 @@ import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.RedStoneWireBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import dev.latvian.mods.rhino.*;
@@ -46,14 +45,20 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
     private static final String CURRENT_LESSON_KEY = "currentLesson";
     public static final long STEP_DELAY_MS = 500L;
     
-    private String code = "// Write your code here\nconsole.log(\"Hello, Agent!\");\nagent.move(1);\n";
+    private static final String DEFAULT_CODE = "// Write your code here\nconsole.log(\"Hello, Agent!\");\nagent.move(1);\n";
+    private String code = DEFAULT_CODE;
     private Direction direction = Direction.NORTH;
     private BlockPos agentPosition = BlockPos.ZERO;
+    private BlockPos linkedCompletionBlockPos = BlockPos.ZERO;
     private int executionCount = 0;
     private static final int MAX_OPERATIONS = 100;
     private ServerPlayer executingPlayer;
     private String currentLessonId = null;
     private volatile boolean executionInProgress = false;
+
+    // Original position and direction to restore after execution
+    private BlockPos originalPosition = BlockPos.ZERO;
+    private Direction originalDirection = Direction.NORTH;
 
     public AgentBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.AGENT_BLOCK_ENTITY.get(), pos, state);
@@ -124,6 +129,11 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
         executingPlayer = player;
         executionCount = 0;
         agentPosition = this.worldPosition;
+        
+        // Store original position and direction for restoration after execution
+        originalPosition = this.worldPosition;
+        originalDirection = this.direction;
+        
         startExecutionAsync(player, this.code);
     }
 
@@ -145,6 +155,11 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
         executingPlayer = serverPlayer;
         executionCount = 0;
         agentPosition = this.worldPosition;
+        
+        // Store original position and direction for restoration after execution
+        originalPosition = this.worldPosition;
+        originalDirection = this.direction;
+        
         startExecutionAsync(serverPlayer, code);
         return "Code execution started";
     }
@@ -182,16 +197,20 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
 
     private void startExecutionAsync(ServerPlayer player, String codeToRun) {
         executionInProgress = true;
+        // Capture the starting state before any movement occurs
+        this.originalPosition = this.worldPosition;
+        this.originalDirection = this.direction;
+
         CompletableFuture.runAsync(() -> {
             TeachingAgent.setCurrentPlayer(player);
             Lesson lesson = getCurrentLesson();
-
+            AgentAPI agentApi = null;
             try {
                 RhinoContext rhino = new RhinoContext(lesson);
                 Scriptable scope = rhino.getRuntime().initStandardObjects();
                 rhino.setupGlobals(scope);
 
-                AgentAPI agentApi = new AgentAPI(this, player, lesson);
+                agentApi = new AgentAPI(this, player, lesson);
                 ScriptableObject.putProperty(scope, "agent", agentApi, rhino.getRuntime());
 
                 rhino.execute(codeToRun, scope);
@@ -202,214 +221,168 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
                 LOGGER.error("Agent code execution error: {}", e.getMessage());
             } finally {
                 executionInProgress = false;
-                
-                if (level instanceof ServerLevel serverLevel) {
-                    // First check if ANY powered completion block exists
-                    boolean hasPowered = hasPoweredCompletionBlock(serverLevel);
-                    LOGGER.info("Has powered completion block: {}", hasPowered);
-                    
-                    if (hasPowered) {
-                        // Find the completion block entity to get commands
-                        lastCompletionCommands = null; // Reset
-                        CompletionBlockEntity completionBlock = findCompletionBlockEntity(serverLevel);
-                        String successCmd = null;
-                        if (completionBlock != null) {
-                            successCmd = completionBlock.getSuccessCommand();
+                final AgentAPI agentApiFinal = agentApi;
+
+            if (level instanceof ServerLevel serverLevel) {
+                serverLevel.getServer().execute(() -> {
+                    AgentBlockEntity activeAgent = agentApiFinal != null ? agentApiFinal.getAgentBlock() : this;
+
+                    boolean hasLink = hasLinkedCompletionBlock();
+                    BlockPos linkedPos = getLinkedCompletionBlockPos();
+                    CompletionBlockEntity completionBlock = findCompletionBlock(serverLevel);
+
+                    if (completionBlock != null) {
+                        completionBlock.onAgentExecutionComplete(serverLevel, player);
+                        boolean success = serverLevel.hasNeighborSignal(completionBlock.getBlockPos());
+                        if (success) {
+                            resetUserCodeToDefault();
                         }
-                        // If no block entity, check stored commands
-                        if ((successCmd == null || successCmd.isEmpty()) && lastCompletionCommands != null) {
-                            successCmd = lastCompletionCommands[0];
-                        }
-                        // If still empty, use default
-                        if (successCmd == null || successCmd.isEmpty()) {
-                            successCmd = "give @p diamond 1";
-                        }
-                        if (!successCmd.isEmpty()) {
-                            executeCommand(serverLevel, successCmd);
-                        }
-                        TeachingAgent.sendMessageToPlayer(player, "§aLesson completed!");
+                    } else if (!hasLink) {
+                        LOGGER.info("No completion block linked in agent NBT at {}", this.worldPosition);
+                        TeachingAgent.sendMessageToPlayer(player, "§cLesson failed! No completion block link is set in the agent.");
                     } else {
-                        // Try to find any completion block (even unpowered) for failure command
-                        lastCompletionCommands = null; // Reset
-                        CompletionBlockEntity nearestBlock = findNearestCompletionBlock(serverLevel);
-                        String failureCmd = null;
-                        if (nearestBlock != null) {
-                            failureCmd = nearestBlock.getFailureCommand();
+                        String rootCause;
+                        if (!serverLevel.isLoaded(linkedPos)) {
+                            rootCause = "linked completion position is not loaded";
+                        } else if (!(serverLevel.getBlockState(linkedPos).getBlock() instanceof CompletionBlock)) {
+                            rootCause = "linked position does not contain a completion block";
+                        } else if (!(serverLevel.getBlockEntity(linkedPos) instanceof CompletionBlockEntity)) {
+                            rootCause = "linked position does not contain a completion block entity";
+                        } else {
+                            rootCause = "unknown (invalid link state)";
                         }
-                        // If no block entity, check stored commands
-                        if ((failureCmd == null || failureCmd.isEmpty()) && lastCompletionCommands != null) {
-                            failureCmd = lastCompletionCommands[1];
-                        }
-                        // If still empty, use default
-                        if (failureCmd == null || failureCmd.isEmpty()) {
-                            failureCmd = "tellraw @p {\"text\":\"Lesson failed - try again!\",\"color\":\"red\"}";
-                        }
-                        if (!failureCmd.isEmpty()) {
-                            executeCommand(serverLevel, failureCmd);
-                        }
-                        TeachingAgent.sendMessageToPlayer(player, "§cLesson failed! Completion block not powered.");
+
+                        LOGGER.info("Linked completion block reference invalid for agent at {}: {}", this.worldPosition, rootCause);
+                        TeachingAgent.sendMessageToPlayer(player, "§cLesson failed! Completion block linked in agent is invalid: " + rootCause + ". Please reconnect with connector and try again.");
+
+                        // Reset invalid link to force reconnect next run
+                        setLinkedCompletionBlockPos(BlockPos.ZERO);
+                        LOGGER.info("Agent linked completion block was reset for agent at {}", this.worldPosition);
                     }
+
+                    // Always restore agent to original position and direction using the active instance
+                    activeAgent.restoreAgentToOriginalState();
+
+                    executingPlayer = null;
+                    TeachingAgent.setCurrentPlayer(null);
+                });
+            } else {
+                // Fallback (should not happen), do restoration on current thread.
+                AgentBlockEntity activeAgent = this;
+                if (agentApiFinal != null) {
+                    activeAgent = agentApiFinal.getAgentBlock();
                 }
-                
+                activeAgent.restoreAgentToOriginalState();
                 executingPlayer = null;
                 TeachingAgent.setCurrentPlayer(null);
             }
+        }
         });
     }
     
-    private boolean hasPoweredCompletionBlock(ServerLevel level) {
-        int scanRadius = 16;
-        BlockPos agentPos = getAgentPosition();
-        
-        for (int x = -scanRadius; x <= scanRadius; x++) {
-            for (int y = -scanRadius; y <= scanRadius; y++) {
-                for (int z = -scanRadius; z <= scanRadius; z++) {
-                    BlockPos checkPos = agentPos.offset(x, y, z);
-                    BlockState state = level.getBlockState(checkPos);
-                    
-                    if (state.getBlock() instanceof CompletionBlock) {
-                        if (isBlockPowered(level, checkPos)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        return false;
-    }
-    
-    private CompletionBlockEntity findCompletionBlockEntity(ServerLevel level) {
-        int scanRadius = 16;
-        BlockPos agentPos = getAgentPosition();
-        
-        for (int x = -scanRadius; x <= scanRadius; x++) {
-            for (int y = -scanRadius; y <= scanRadius; y++) {
-                for (int z = -scanRadius; z <= scanRadius; z++) {
-                    BlockPos checkPos = agentPos.offset(x, y, z);
-                    BlockState state = level.getBlockState(checkPos);
-                    
-                    if (state.getBlock() instanceof CompletionBlock) {
-                        if (isBlockPowered(level, checkPos)) {
-                            // Try to get block entity
-                            BlockEntity be = level.getBlockEntity(checkPos);
-                            LOGGER.info("BlockEntity at {} = {}", checkPos, be);
-                            if (be instanceof CompletionBlockEntity completion) {
-                                return completion;
-                            }
-                            // If no block entity, check our stored commands
-                            String[] storedCommands = storedCompletionCommands.get(checkPos);
-                            if (storedCommands != null) {
-                                LOGGER.info("Using stored commands for completion block at {}: {}", checkPos, storedCommands);
-                                // Store for later use
-                                lastCompletionCommands = storedCommands;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return null;
-    }
-    
-    private String[] lastCompletionCommands = null;
-    
-    // Store completion block commands when saved from GUI
-    private static final java.util.Map<BlockPos, String[]> storedCompletionCommands = new java.util.concurrent.ConcurrentHashMap<>();
-    
-    public static void storeCompletionCommands(BlockPos pos, String success, String failure) {
-        storedCompletionCommands.put(pos, new String[]{success, failure});
-        LOGGER.info("Stored completion commands for {}: success={}, failure={}", pos, success, failure);
-    }
-    
-    public static String[] getStoredCompletionCommands(BlockPos pos) {
-        return storedCompletionCommands.get(pos);
-    }
-    
-    private void executeCommand(ServerLevel level, String command) {
+    private void executeCommand(ServerLevel level, ServerPlayer player, String command) {
         if (command == null || command.isEmpty()) return;
         
         MinecraftServer server = level.getServer();
         if (server == null) return;
-
-        Runnable task = () -> {
-            LOGGER.info("Executing completion command: {}", command);
+        
+        LOGGER.info("Executing completion command: {} for player {}", command, player.getName().getString());
+        try {
             server.getCommands().performPrefixedCommand(
-                server.createCommandSourceStack().withSuppressedOutput().withLevel(level),
+                player.createCommandSourceStack().withSuppressedOutput(),
                 command
             );
-        };
-
-        if (server.isSameThread()) {
-            task.run();
-        } else {
-            server.execute(task);
+            LOGGER.info("Command executed successfully");
+        } catch (Exception e) {
+            LOGGER.error("Failed to execute completion command: {}", e.getMessage());
         }
     }
-    
-    private boolean isBlockPowered(ServerLevel level, BlockPos pos) {
-        for (Direction dir : Direction.values()) {
-            BlockPos neighborPos = pos.relative(dir);
-            BlockState neighborState = level.getBlockState(neighborPos);
-            int power = neighborState.getSignal(level, neighborPos, dir.getOpposite());
-            if (power > 0) {
-                return true;
+
+    private void restoreAgentToOriginalState() {
+        Level level = this.getLevel();
+        if (level == null || level.isClientSide) {
+            return;
+        }
+
+        BlockPos targetPos = originalPosition == null ? this.worldPosition : this.originalPosition;
+        Direction targetDir = originalDirection == null ? this.direction : this.originalDirection;
+
+        // Physically move back if the block entity was relocated during execution
+        AgentBlockEntity current = this;
+        if (!targetPos.equals(this.worldPosition)) {
+            AgentBlockEntity moved = this.setAgentPosition(targetPos);
+            if (moved != null) {
+                current = moved;
             }
         }
-        return false;
+
+        current.agentPosition = targetPos;
+        current.direction = targetDir;
+
+        BlockState state = level.getBlockState(targetPos);
+        if (state.hasProperty(AgentBlock.FACING)) {
+            level.setBlock(targetPos, state.setValue(AgentBlock.FACING, targetDir), 3);
+            if (level instanceof ServerLevel serverLevel) {
+                serverLevel.getChunkSource().blockChanged(targetPos);
+            }
+        }
+
+        current.setChanged();
+        LOGGER.info("Agent restored to original position {} and direction {}", targetPos, targetDir);
     }
     
-    private CompletionBlockEntity findNearestCompletionBlock(ServerLevel level) {
-        int scanRadius = 16;
-        BlockPos agentPos = getAgentPosition();
-        
-        for (int x = -scanRadius; x <= scanRadius; x++) {
-            for (int y = -scanRadius; y <= scanRadius; y++) {
-                for (int z = -scanRadius; z <= scanRadius; z++) {
-                    BlockPos checkPos = agentPos.offset(x, y, z);
+    private CompletionBlockEntity findCompletionBlock(ServerLevel level) {
+        if (hasLinkedCompletionBlock()) {
+            BlockPos checkPos = getLinkedCompletionBlockPos();
+            if (level.isLoaded(checkPos) && level.getBlockState(checkPos).getBlock() instanceof CompletionBlock) {
+                BlockEntity be = level.getBlockEntity(checkPos);
+                if (be instanceof CompletionBlockEntity completion) {
+                    LOGGER.info("Linked completion block found at {}", checkPos);
+                    return completion;
+                }
+
+                // Recovery: block is correct type but missing block entity. Try to create and reattach.
+                LOGGER.warn("Linked completion block at {} is missing entity; attempting recovery.", checkPos);
+                if (level instanceof ServerLevel serverLevel) {
                     BlockState state = level.getBlockState(checkPos);
-                    
-                    if (state.getBlock() instanceof CompletionBlock) {
-                        BlockEntity be = level.getBlockEntity(checkPos);
-                        if (be instanceof CompletionBlockEntity completion) {
-                            return completion;
-                        }
-                        // Check stored commands
-                        String[] storedCommands = storedCompletionCommands.get(checkPos);
-                        if (storedCommands != null) {
-                            lastCompletionCommands = storedCommands;
-                            LOGGER.info("Found stored commands in findNearestCompletionBlock: {}", storedCommands);
-                        }
+                    CompletionBlockEntity created = new CompletionBlockEntity(checkPos, state);
+                    level.setBlockEntity(created);
+                    serverLevel.sendBlockUpdated(checkPos, state, state, 3);
+
+                    BlockEntity recoveredBe = level.getBlockEntity(checkPos);
+                    if (recoveredBe instanceof CompletionBlockEntity recoveredCompletion) {
+                        LOGGER.info("Recovered and attached completion block entity at {}", checkPos);
+                        return recoveredCompletion;
                     }
                 }
+
+                LOGGER.warn("Recovery failed for linked completion block at {}", checkPos);
+            } else {
+                LOGGER.info("Linked completion block at {} is missing or wrong type", checkPos);
             }
         }
-        
-        return null;
-    }
 
-    private boolean hasPoweredNeighbor(ServerLevel level, BlockPos pos) {
-        for (Direction dir : Direction.values()) {
-            BlockPos neighborPos = pos.relative(dir);
-            BlockState neighbor = level.getBlockState(neighborPos);
-            Block neighborBlock = neighbor.getBlock();
-            if (neighborBlock == Blocks.REDSTONE_BLOCK) {
-                return true;
-            }
-            if (neighborBlock instanceof RedStoneWireBlock) {
-                Integer power = neighbor.getValue(RedStoneWireBlock.POWER);
-                if (power != null && power > 0) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return null; // Only linked completion blocks are valid now
     }
-
+    
     public BlockPos getAgentPosition() {
         if (agentPosition.equals(BlockPos.ZERO)) {
             agentPosition = this.worldPosition;
         }
         return agentPosition;
+    }
+
+    public boolean hasLinkedCompletionBlock() {
+        return linkedCompletionBlockPos != null && !linkedCompletionBlockPos.equals(BlockPos.ZERO);
+    }
+
+    public BlockPos getLinkedCompletionBlockPos() {
+        return linkedCompletionBlockPos;
+    }
+
+    public void setLinkedCompletionBlockPos(BlockPos linkedCompletionBlockPos) {
+        this.linkedCompletionBlockPos = linkedCompletionBlockPos == null ? BlockPos.ZERO : linkedCompletionBlockPos;
+        setChanged();
     }
 
     public AgentBlockEntity setAgentPosition(BlockPos pos) {
@@ -548,6 +521,12 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
     public void syncCustomData() {
         this.setChanged();
     }
+
+    private void resetUserCodeToDefault() {
+        this.code = DEFAULT_CODE;
+        setChanged();
+        LOGGER.info("Agent code reset to default after successful lesson at {}", this.worldPosition);
+    }
     
     @Override
     public CompoundTag getPersistentData() {
@@ -600,6 +579,16 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
             this.currentLessonId = tag.getString(CURRENT_LESSON_KEY);
             LOGGER.info("Loaded lesson from NBT: {}", this.currentLessonId);
         }
+        if (tag.contains("LinkedCompletionX") && tag.contains("LinkedCompletionY") && tag.contains("LinkedCompletionZ")) {
+            this.linkedCompletionBlockPos = new BlockPos(tag.getInt("LinkedCompletionX"), tag.getInt("LinkedCompletionY"), tag.getInt("LinkedCompletionZ"));
+            LOGGER.info("Loaded linked completion block from NBT: {}", this.linkedCompletionBlockPos);
+        }
+        if (tag.contains("OriginalX") && tag.contains("OriginalY") && tag.contains("OriginalZ")) {
+            this.originalPosition = new BlockPos(tag.getInt("OriginalX"), tag.getInt("OriginalY"), tag.getInt("OriginalZ"));
+        }
+        if (tag.contains("OriginalDirection")) {
+            this.originalDirection = Direction.from3DDataValue(tag.getInt("OriginalDirection"));
+        }
     }
     
     private CompoundTag saveToTag(CompoundTag tag) {
@@ -607,6 +596,19 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
         tag.putInt("Direction", direction.get3DDataValue());
         if (currentLessonId != null) {
             tag.putString(CURRENT_LESSON_KEY, currentLessonId);
+        }
+        if (hasLinkedCompletionBlock()) {
+            tag.putInt("LinkedCompletionX", linkedCompletionBlockPos.getX());
+            tag.putInt("LinkedCompletionY", linkedCompletionBlockPos.getY());
+            tag.putInt("LinkedCompletionZ", linkedCompletionBlockPos.getZ());
+        }
+        if (originalPosition != null && !originalPosition.equals(BlockPos.ZERO)) {
+            tag.putInt("OriginalX", originalPosition.getX());
+            tag.putInt("OriginalY", originalPosition.getY());
+            tag.putInt("OriginalZ", originalPosition.getZ());
+        }
+        if (originalDirection != null) {
+            tag.putInt("OriginalDirection", originalDirection.get3DDataValue());
         }
         LOGGER.info("Saved code to NBT: {}", code.substring(0, Math.min(50, code.length())));
         return tag;

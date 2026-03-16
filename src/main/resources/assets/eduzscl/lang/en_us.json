@@ -5,6 +5,7 @@
   "item.eduzscl.example_item": "Example Item",
   "item.eduzscl.agent_block": "Agent Block",
   "item.eduzscl.completion_block": "Completion Block",
+  "item.eduzscl.connector": "Connector",
   "gui.eduzscl.agent_editor.title": "Agent Code Editor",
   "gui.eduzscl.agent_editor.run": "Run",
   "gui.eduzscl.agent_editor.reset": "Reset",

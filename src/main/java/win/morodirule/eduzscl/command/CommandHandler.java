@@ -5,6 +5,7 @@ import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.Level;
@@ -40,7 +41,8 @@ public class CommandHandler {
                     .then(Commands.argument("x", com.mojang.brigadier.arguments.IntegerArgumentType.integer())
                         .then(Commands.argument("y", com.mojang.brigadier.arguments.IntegerArgumentType.integer())
                             .then(Commands.argument("z", com.mojang.brigadier.arguments.IntegerArgumentType.integer())
-                                .executes(CommandHandler::openAgentGuiAtPos))))));
+                                .executes(CommandHandler::openAgentGuiAtPos)))))
+        );
     }
     
     private static int runCode(CommandContext<CommandSourceStack> ctx) {
@@ -171,4 +173,5 @@ public class CommandHandler {
         }
         return blockEntity;
     }
+
 }

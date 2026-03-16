@@ -36,6 +36,10 @@ public class AgentAPI {
         this.lesson = lesson;
     }
 
+    public AgentBlockEntity getAgentBlock() {
+        return agentBlock;
+    }
+
     private boolean checkOperations() {
         return agentBlock.incrementOperations();
     }
@@ -214,6 +218,11 @@ public class AgentAPI {
 
                 if (!state.isAir()) {
                     return "Blocked at step " + stepIndex;
+                }
+
+                // Check for entities blocking the path
+                if (isEntityInBlock(level, next)) {
+                    return "Entity blocking at step " + stepIndex;
                 }
 
                 this.agentBlock = agentBlock.setAgentPosition(next);
@@ -443,6 +452,51 @@ public class AgentAPI {
 
     public String getDirection() {
         return onServerThread(() -> agentBlock.getAgentDirection().getName(), "unknown");
+    }
+
+    public String attack() {
+        if (!checkOperations()) return "Operation limit exceeded";
+        
+        return onServerThread(() -> {
+            Level level = resolveLevel();
+            if (level == null) return "No world";
+            
+            if (!(level instanceof net.minecraft.server.level.ServerLevel serverLevel)) {
+                return "Must be on server";
+            }
+            
+            Direction facing = agentBlock.getAgentDirection();
+            BlockPos targetPos = agentBlock.getAgentPosition().relative(facing);
+            
+            // Find and kill the entity in front
+            List<net.minecraft.world.entity.Entity> entities = level.getEntities(
+                null,
+                new net.minecraft.world.phys.AABB(targetPos)
+            );
+            
+            if (entities.isEmpty()) {
+                return "No entity in front";
+            }
+            
+            // Kill the first entity found (highest priority)
+            net.minecraft.world.entity.Entity target = entities.get(0);
+            target.kill(serverLevel);
+            
+            return "Killed " + target.getEncodeId();
+        }, "No server");
+    }
+
+    private boolean isEntityInBlock(Level level, BlockPos pos) {
+        if (level.isClientSide) return false;
+        
+        List<net.minecraft.world.entity.Entity> entities = level.getEntities(
+            null,
+            new net.minecraft.world.phys.AABB(pos)
+        );
+        
+        // Filter out any entities that shouldn't block movement
+        // (you can customize this if needed)
+        return !entities.isEmpty();
     }
 
     private Block getBlockById(String blockId) {

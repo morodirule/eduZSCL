@@ -54,11 +54,16 @@ public class AgentBlockMenu extends AbstractContainerMenu {
 
     public AgentBlockMenu(int id, Inventory playerInventory, BlockPos blockPos) {
         super(ModMenus.AGENT_BLOCK_MENU.get(), id);
-        this.blockPos = blockPos;
-        MENU_ID_TO_POS.put(id, blockPos);
-        LOGGER.info("AgentBlockMenu server constructor - id: {}, blockPos: {}", id, blockPos);
+        if (blockPos == null) {
+            LOGGER.error("AgentBlockMenu server constructor received null blockPos for id {}", id);
+            this.blockPos = BlockPos.ZERO;
+        } else {
+            this.blockPos = blockPos;
+            MENU_ID_TO_POS.put(id, blockPos);
+        }
+        LOGGER.info("AgentBlockMenu server constructor - id: {}, blockPos: {}", id, this.blockPos);
         Player player = playerInventory.player;
-        BlockEntity be = player.level().getBlockEntity(blockPos);
+        BlockEntity be = player.level().getBlockEntity(this.blockPos);
         this.blockEntity = be instanceof AgentBlockEntity ? (AgentBlockEntity) be : null;
         
         // Cache the code so the client receives it even if the block entity NBT hasn't synced yet

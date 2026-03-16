@@ -24,6 +24,14 @@ public class TeachingAgent {
 
     private static void registerBuiltInLessons() {
         registerLesson(new Lesson001_HelloWorld());
+        registerLesson(new win.morodirule.eduzscl.teaching.lessons.Lesson002_MoveBasics());
+        registerLesson(new win.morodirule.eduzscl.teaching.lessons.Lesson003_MoveBasicsRepeat());
+        registerLesson(new win.morodirule.eduzscl.teaching.lessons.Lesson004_LoopsIntro());
+        registerLesson(new win.morodirule.eduzscl.teaching.lessons.Lesson005_LoopsPath());
+        registerLesson(new win.morodirule.eduzscl.teaching.lessons.Lesson006_AttackBasics());
+        registerLesson(new win.morodirule.eduzscl.teaching.lessons.Lesson007_AttackLoops());
+        registerLesson(new win.morodirule.eduzscl.teaching.lessons.Lesson008_BuildDestroy());
+        registerLesson(new win.morodirule.eduzscl.teaching.lessons.Lesson009_FreePlay());
     }
 
     private static void loadJsonLessons() {

@@ -21,8 +21,10 @@ import win.morodirule.eduzscl.registry.ModBlocks;
 import win.morodirule.eduzscl.registry.ModItems;
 import win.morodirule.eduzscl.registry.ModBlockEntities;
 import win.morodirule.eduzscl.registry.ModMenus;
+import win.morodirule.eduzscl.registry.ModEntities;
 import win.morodirule.eduzscl.event.ServerEvents;
 import win.morodirule.eduzscl.event.PlayerEvents;
+import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 
 import org.slf4j.Logger;
 
@@ -38,6 +40,7 @@ public class Eduzscl {
         ModItems.ITEMS.register(modEventBus);
         ModBlockEntities.BLOCK_ENTITIES.register(modEventBus);
         ModMenus.MENUS.register(modEventBus);
+        ModEntities.ENTITIES.register(modEventBus);
 
         ServerEvents.register();
         PlayerEvents.register();
@@ -62,6 +65,7 @@ public class Eduzscl {
         if (event.getTabKey() == CreativeModeTabs.OP_BLOCKS) {
             event.accept(ModItems.AGENT_BLOCK_ITEM);
             event.accept(ModItems.COMPLETION_BLOCK_ITEM);
+            event.accept(ModItems.CONNECTOR_ITEM);
         }
     }
 
@@ -71,6 +75,8 @@ public class Eduzscl {
         public static void onClientSetup(FMLClientSetupEvent event) {
             LOGGER.info("HELLO FROM CLIENT SETUP");
             LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+            
+            // No entities to register for rendering since persistent mob support has been removed.
         }
 
         @SubscribeEvent

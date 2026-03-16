@@ -8,6 +8,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.players.PlayerList;
@@ -155,14 +156,14 @@ public class CompletionBlockScreen extends Screen implements MenuAccess<Completi
             CompletionBlockEntity completionBlock = null;
             if (serverPlayer.containerMenu instanceof CompletionBlockMenu completionMenu) {
                 BlockPos menuPos = completionMenu.getBlockPos();
-                var menuBe = serverPlayer.serverLevel().getBlockEntity(menuPos);
+                BlockEntity menuBe = serverPlayer.serverLevel().getBlockEntity(menuPos);
                 if (menuBe instanceof CompletionBlockEntity completion) {
                     completionBlock = completion;
                 }
             }
 
             if (completionBlock == null && fallbackPos != null && !fallbackPos.equals(BlockPos.ZERO)) {
-                var be = serverPlayer.serverLevel().getBlockEntity(fallbackPos);
+                BlockEntity be = serverPlayer.serverLevel().getBlockEntity(fallbackPos);
                 if (be instanceof CompletionBlockEntity completion) {
                     completionBlock = completion;
                 }
@@ -171,8 +172,6 @@ public class CompletionBlockScreen extends Screen implements MenuAccess<Completi
             if (completionBlock != null) {
                 completionBlock.setSuccessCommand(successCmd);
                 completionBlock.setFailureCommand(failureCmd);
-                // Store the commands so we can look them up later even if block entity isn't loaded
-                win.morodirule.eduzscl.blockentity.AgentBlockEntity.storeCompletionCommands(fallbackPos, successCmd, failureCmd);
             }
         });
     }
