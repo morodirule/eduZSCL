@@ -15,6 +15,7 @@ import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.RedStoneWireBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import dev.latvian.mods.rhino.*;
@@ -203,20 +204,47 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
                 executionInProgress = false;
                 
                 if (level instanceof ServerLevel serverLevel) {
-                    CompletionBlockEntity completionBlock = findCompletionBlock(serverLevel);
-                    if (completionBlock != null) {
-                        String successCmd = completionBlock.getSuccessCommand();
-                        if (successCmd != null && !successCmd.isEmpty()) {
+                    // First check if ANY powered completion block exists
+                    boolean hasPowered = hasPoweredCompletionBlock(serverLevel);
+                    LOGGER.info("Has powered completion block: {}", hasPowered);
+                    
+                    if (hasPowered) {
+                        // Find the completion block entity to get commands
+                        lastCompletionCommands = null; // Reset
+                        CompletionBlockEntity completionBlock = findCompletionBlockEntity(serverLevel);
+                        String successCmd = null;
+                        if (completionBlock != null) {
+                            successCmd = completionBlock.getSuccessCommand();
+                        }
+                        // If no block entity, check stored commands
+                        if ((successCmd == null || successCmd.isEmpty()) && lastCompletionCommands != null) {
+                            successCmd = lastCompletionCommands[0];
+                        }
+                        // If still empty, use default
+                        if (successCmd == null || successCmd.isEmpty()) {
+                            successCmd = "give @p diamond 1";
+                        }
+                        if (!successCmd.isEmpty()) {
                             executeCommand(serverLevel, successCmd);
                         }
                         TeachingAgent.sendMessageToPlayer(player, "§aLesson completed!");
                     } else {
-                        String failureCmd = "";
+                        // Try to find any completion block (even unpowered) for failure command
+                        lastCompletionCommands = null; // Reset
                         CompletionBlockEntity nearestBlock = findNearestCompletionBlock(serverLevel);
+                        String failureCmd = null;
                         if (nearestBlock != null) {
                             failureCmd = nearestBlock.getFailureCommand();
                         }
-                        if (failureCmd != null && !failureCmd.isEmpty()) {
+                        // If no block entity, check stored commands
+                        if ((failureCmd == null || failureCmd.isEmpty()) && lastCompletionCommands != null) {
+                            failureCmd = lastCompletionCommands[1];
+                        }
+                        // If still empty, use default
+                        if (failureCmd == null || failureCmd.isEmpty()) {
+                            failureCmd = "tellraw @p {\"text\":\"Lesson failed - try again!\",\"color\":\"red\"}";
+                        }
+                        if (!failureCmd.isEmpty()) {
                             executeCommand(serverLevel, failureCmd);
                         }
                         TeachingAgent.sendMessageToPlayer(player, "§cLesson failed! Completion block not powered.");
@@ -229,20 +257,7 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
         });
     }
     
-    private void executeCommand(ServerLevel level, String command) {
-        if (command == null || command.isEmpty()) return;
-        
-        MinecraftServer server = level.getServer();
-        if (server == null) return;
-        
-        LOGGER.info("Executing completion command: {}", command);
-        server.getCommands().performPrefixedCommand(
-            server.createCommandSourceStack().withSuppressedOutput(),
-            command
-        );
-    }
-    
-    private CompletionBlockEntity findCompletionBlock(ServerLevel level) {
+    private boolean hasPoweredCompletionBlock(ServerLevel level) {
         int scanRadius = 16;
         BlockPos agentPos = getAgentPosition();
         
@@ -253,20 +268,94 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
                     BlockState state = level.getBlockState(checkPos);
                     
                     if (state.getBlock() instanceof CompletionBlock) {
-                        int power = level.getBestNeighborSignal(checkPos);
-                        if (power > 0) {
-                            LOGGER.info("Completion block found and powered at {}", checkPos);
+                        if (isBlockPowered(level, checkPos)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+    
+    private CompletionBlockEntity findCompletionBlockEntity(ServerLevel level) {
+        int scanRadius = 16;
+        BlockPos agentPos = getAgentPosition();
+        
+        for (int x = -scanRadius; x <= scanRadius; x++) {
+            for (int y = -scanRadius; y <= scanRadius; y++) {
+                for (int z = -scanRadius; z <= scanRadius; z++) {
+                    BlockPos checkPos = agentPos.offset(x, y, z);
+                    BlockState state = level.getBlockState(checkPos);
+                    
+                    if (state.getBlock() instanceof CompletionBlock) {
+                        if (isBlockPowered(level, checkPos)) {
+                            // Try to get block entity
                             BlockEntity be = level.getBlockEntity(checkPos);
+                            LOGGER.info("BlockEntity at {} = {}", checkPos, be);
                             if (be instanceof CompletionBlockEntity completion) {
                                 return completion;
+                            }
+                            // If no block entity, check our stored commands
+                            String[] storedCommands = storedCompletionCommands.get(checkPos);
+                            if (storedCommands != null) {
+                                LOGGER.info("Using stored commands for completion block at {}: {}", checkPos, storedCommands);
+                                // Store for later use
+                                lastCompletionCommands = storedCommands;
                             }
                         }
                     }
                 }
             }
         }
-        
         return null;
+    }
+    
+    private String[] lastCompletionCommands = null;
+    
+    // Store completion block commands when saved from GUI
+    private static final java.util.Map<BlockPos, String[]> storedCompletionCommands = new java.util.concurrent.ConcurrentHashMap<>();
+    
+    public static void storeCompletionCommands(BlockPos pos, String success, String failure) {
+        storedCompletionCommands.put(pos, new String[]{success, failure});
+        LOGGER.info("Stored completion commands for {}: success={}, failure={}", pos, success, failure);
+    }
+    
+    public static String[] getStoredCompletionCommands(BlockPos pos) {
+        return storedCompletionCommands.get(pos);
+    }
+    
+    private void executeCommand(ServerLevel level, String command) {
+        if (command == null || command.isEmpty()) return;
+        
+        MinecraftServer server = level.getServer();
+        if (server == null) return;
+
+        Runnable task = () -> {
+            LOGGER.info("Executing completion command: {}", command);
+            server.getCommands().performPrefixedCommand(
+                server.createCommandSourceStack().withSuppressedOutput().withLevel(level),
+                command
+            );
+        };
+
+        if (server.isSameThread()) {
+            task.run();
+        } else {
+            server.execute(task);
+        }
+    }
+    
+    private boolean isBlockPowered(ServerLevel level, BlockPos pos) {
+        for (Direction dir : Direction.values()) {
+            BlockPos neighborPos = pos.relative(dir);
+            BlockState neighborState = level.getBlockState(neighborPos);
+            int power = neighborState.getSignal(level, neighborPos, dir.getOpposite());
+            if (power > 0) {
+                return true;
+            }
+        }
+        return false;
     }
     
     private CompletionBlockEntity findNearestCompletionBlock(ServerLevel level) {
@@ -284,12 +373,36 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
                         if (be instanceof CompletionBlockEntity completion) {
                             return completion;
                         }
+                        // Check stored commands
+                        String[] storedCommands = storedCompletionCommands.get(checkPos);
+                        if (storedCommands != null) {
+                            lastCompletionCommands = storedCommands;
+                            LOGGER.info("Found stored commands in findNearestCompletionBlock: {}", storedCommands);
+                        }
                     }
                 }
             }
         }
         
         return null;
+    }
+
+    private boolean hasPoweredNeighbor(ServerLevel level, BlockPos pos) {
+        for (Direction dir : Direction.values()) {
+            BlockPos neighborPos = pos.relative(dir);
+            BlockState neighbor = level.getBlockState(neighborPos);
+            Block neighborBlock = neighbor.getBlock();
+            if (neighborBlock == Blocks.REDSTONE_BLOCK) {
+                return true;
+            }
+            if (neighborBlock instanceof RedStoneWireBlock) {
+                Integer power = neighbor.getValue(RedStoneWireBlock.POWER);
+                if (power != null && power > 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public BlockPos getAgentPosition() {
