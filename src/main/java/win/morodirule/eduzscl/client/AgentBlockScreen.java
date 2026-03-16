@@ -314,7 +314,7 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
             graphics.drawString(this.font, Component.translatable("gui.eduzscl.agent_editor.tips").getString(), sidebarX + 5, windowY + yOffset, 0x00FFFF);
             yOffset += 15;
             
-            String[] tipLines = splitString(currentTips, SIDEBAR_WIDTH - 10);
+            String[] tipLines = splitStringWithNewlines(currentTips, SIDEBAR_WIDTH - 10);
             for (String line : tipLines) {
                 if (yOffset < windowY + WINDOW_HEIGHT - 20) {
                     graphics.drawString(this.font, line, sidebarX + 5, windowY + yOffset, 0xFFCCCCCC);
@@ -347,6 +347,37 @@ public class AgentBlockScreen extends Screen implements MenuAccess<AgentBlockMen
             lines.add(currentLine.toString());
         }
         
+        return lines.toArray(new String[0]);
+    }
+
+    private String[] splitStringWithNewlines(String text, int maxWidth) {
+        if (text == null || text.isEmpty()) {
+            return new String[]{""};
+        }
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        String[] rawLines = text.split("\\r?\\n", -1);
+        for (String rawLine : rawLines) {
+            if (rawLine.isEmpty()) {
+                lines.add("");
+                continue;
+            }
+            String[] words = rawLine.split(" ");
+            StringBuilder currentLine = new StringBuilder();
+            for (String word : words) {
+                String testLine = currentLine.length() == 0 ? word : currentLine + " " + word;
+                if (font.width(testLine) <= maxWidth) {
+                    currentLine = new StringBuilder(testLine);
+                } else {
+                    if (currentLine.length() > 0) {
+                        lines.add(currentLine.toString());
+                    }
+                    currentLine = new StringBuilder(word);
+                }
+            }
+            if (currentLine.length() > 0) {
+                lines.add(currentLine.toString());
+            }
+        }
         return lines.toArray(new String[0]);
     }
 
