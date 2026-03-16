@@ -59,8 +59,10 @@ public class Eduzscl {
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.OP_BLOCKS)
+        if (event.getTabKey() == CreativeModeTabs.OP_BLOCKS) {
             event.accept(ModItems.AGENT_BLOCK_ITEM);
+            event.accept(ModItems.COMPLETION_BLOCK_ITEM);
+        }
     }
 
     @EventBusSubscriber(modid = MODID, value = Dist.CLIENT)
@@ -77,6 +79,10 @@ public class Eduzscl {
                 win.morodirule.eduzscl.menu.AgentBlockMenu.TYPE, 
                 (win.morodirule.eduzscl.menu.AgentBlockMenu menu, Inventory inv, Component title) -> 
                     new win.morodirule.eduzscl.client.AgentBlockScreen(menu, inv, title));
+            event.register(
+                win.morodirule.eduzscl.menu.CompletionBlockMenu.TYPE, 
+                (win.morodirule.eduzscl.menu.CompletionBlockMenu menu, Inventory inv, Component title) -> 
+                    new win.morodirule.eduzscl.client.CompletionBlockScreen(menu, inv, title));
         }
     }
 }

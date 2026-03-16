@@ -7,6 +7,7 @@ import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import win.morodirule.eduzscl.Eduzscl;
 import win.morodirule.eduzscl.block.AgentBlock;
+import win.morodirule.eduzscl.block.CompletionBlock;
 
 public class ModBlocks {
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(Eduzscl.MODID);
@@ -15,5 +16,8 @@ public class ModBlocks {
             BlockBehaviour.Properties.of().mapColor(MapColor.STONE));
 
     public static final DeferredBlock<AgentBlock> AGENT_BLOCK = BLOCKS.registerBlock("agent_block", AgentBlock::new,
+            BlockBehaviour.Properties.of().noOcclusion());
+
+    public static final DeferredBlock<CompletionBlock> COMPLETION_BLOCK = BLOCKS.registerBlock("completion_block", CompletionBlock::new,
             BlockBehaviour.Properties.of().noOcclusion());
 }

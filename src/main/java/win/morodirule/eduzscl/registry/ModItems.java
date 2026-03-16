@@ -16,6 +16,9 @@ public class ModItems {
     public static final DeferredItem<BlockItem> AGENT_BLOCK_ITEM = ITEMS.registerSimpleBlockItem("agent_block",
             ModBlocks.AGENT_BLOCK);
 
+    public static final DeferredItem<BlockItem> COMPLETION_BLOCK_ITEM = ITEMS.registerSimpleBlockItem("completion_block",
+            ModBlocks.COMPLETION_BLOCK);
+
     public static final DeferredItem<Item> EXAMPLE_ITEM = ITEMS.registerSimpleItem("example_item", new Item.Properties()
             .food(new FoodProperties.Builder().alwaysEdible().nutrition(1).saturationModifier(2f).build()));
 }

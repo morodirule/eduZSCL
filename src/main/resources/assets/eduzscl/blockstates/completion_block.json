@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "eduzscl:block/completion_block" }
+  }
+}

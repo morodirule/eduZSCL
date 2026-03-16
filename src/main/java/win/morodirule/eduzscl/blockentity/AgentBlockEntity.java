@@ -24,7 +24,9 @@ import org.slf4j.LoggerFactory;
 import win.morodirule.eduzscl.Eduzscl;
 import win.morodirule.eduzscl.api.AgentAPI;
 import win.morodirule.eduzscl.block.AgentBlock;
+import win.morodirule.eduzscl.block.CompletionBlock;
 import win.morodirule.eduzscl.registry.ModBlockEntities;
+import win.morodirule.eduzscl.registry.ModBlocks;
 import win.morodirule.eduzscl.teaching.RhinoContext;
 import win.morodirule.eduzscl.teaching.TeachingAgent;
 import win.morodirule.eduzscl.teaching.TeachingAgent.Lesson;
@@ -199,10 +201,95 @@ public class AgentBlockEntity extends BlockEntity implements MenuProvider {
                 LOGGER.error("Agent code execution error: {}", e.getMessage());
             } finally {
                 executionInProgress = false;
+                
+                if (level instanceof ServerLevel serverLevel) {
+                    CompletionBlockEntity completionBlock = findCompletionBlock(serverLevel);
+                    if (completionBlock != null) {
+                        String successCmd = completionBlock.getSuccessCommand();
+                        if (successCmd != null && !successCmd.isEmpty()) {
+                            executeCommand(serverLevel, successCmd);
+                        }
+                        TeachingAgent.sendMessageToPlayer(player, "§aLesson completed!");
+                    } else {
+                        String failureCmd = "";
+                        CompletionBlockEntity nearestBlock = findNearestCompletionBlock(serverLevel);
+                        if (nearestBlock != null) {
+                            failureCmd = nearestBlock.getFailureCommand();
+                        }
+                        if (failureCmd != null && !failureCmd.isEmpty()) {
+                            executeCommand(serverLevel, failureCmd);
+                        }
+                        TeachingAgent.sendMessageToPlayer(player, "§cLesson failed! Completion block not powered.");
+                    }
+                }
+                
                 executingPlayer = null;
                 TeachingAgent.setCurrentPlayer(null);
             }
         });
+    }
+    
+    private void executeCommand(ServerLevel level, String command) {
+        if (command == null || command.isEmpty()) return;
+        
+        MinecraftServer server = level.getServer();
+        if (server == null) return;
+        
+        LOGGER.info("Executing completion command: {}", command);
+        server.getCommands().performPrefixedCommand(
+            server.createCommandSourceStack().withSuppressedOutput(),
+            command
+        );
+    }
+    
+    private CompletionBlockEntity findCompletionBlock(ServerLevel level) {
+        int scanRadius = 16;
+        BlockPos agentPos = getAgentPosition();
+        
+        for (int x = -scanRadius; x <= scanRadius; x++) {
+            for (int y = -scanRadius; y <= scanRadius; y++) {
+                for (int z = -scanRadius; z <= scanRadius; z++) {
+                    BlockPos checkPos = agentPos.offset(x, y, z);
+                    BlockState state = level.getBlockState(checkPos);
+                    
+                    if (state.getBlock() instanceof CompletionBlock) {
+                        int power = level.getBestNeighborSignal(checkPos);
+                        if (power > 0) {
+                            LOGGER.info("Completion block found and powered at {}", checkPos);
+                            BlockEntity be = level.getBlockEntity(checkPos);
+                            if (be instanceof CompletionBlockEntity completion) {
+                                return completion;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    private CompletionBlockEntity findNearestCompletionBlock(ServerLevel level) {
+        int scanRadius = 16;
+        BlockPos agentPos = getAgentPosition();
+        
+        for (int x = -scanRadius; x <= scanRadius; x++) {
+            for (int y = -scanRadius; y <= scanRadius; y++) {
+                for (int z = -scanRadius; z <= scanRadius; z++) {
+                    BlockPos checkPos = agentPos.offset(x, y, z);
+                    BlockState state = level.getBlockState(checkPos);
+                    
+                    if (state.getBlock() instanceof CompletionBlock) {
+                        BlockEntity be = level.getBlockEntity(checkPos);
+                        if (be instanceof CompletionBlockEntity completion) {
+                            return completion;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return null;
     }
 
     public BlockPos getAgentPosition() {
